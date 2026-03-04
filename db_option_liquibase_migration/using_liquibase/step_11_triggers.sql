@@ -1,0 +1,51 @@
+-- Trigger responsável por validar e restringir as transições de status
+-- dos objetos do catálogo lógico na tabela tb_databases.
+-- Esta trigger garante que somente transições permitidas no workflow
+-- oficial sejam executadas, impedindo saltos indevidos entre status.
+CREATE TRIGGER tg_status_object_restriction
+BEFORE UPDATE ON data_catalog.tb_databases
+FOR EACH ROW WHEN (NEW.tb_status_id IS DISTINCT FROM OLD.tb_status_id)
+EXECUTE FUNCTION data_catalog.tg_status_object_restriction();
+
+COMMENT ON TRIGGER tg_status_object_restriction 
+ON data_catalog.tb_databases 
+IS 'Trigger responsável por validar e restringir as transições de status dos objetos do catálogo lógico na tabela tb_databases, garantindo que apenas mudanças permitidas no workflow sejam executadas.';
+
+-- Trigger responsável por validar e restringir as transições de status
+-- dos objetos do catálogo lógico na tabela tb_schemas.
+-- Esta trigger garante que o workflow seja respeitado e que o schema
+-- só avance para status válidos conforme as regras de governança.
+CREATE TRIGGER tg_status_object_restriction
+BEFORE UPDATE ON data_catalog.tb_schemas
+FOR EACH ROW WHEN (NEW.tb_status_id IS DISTINCT FROM OLD.tb_status_id)
+EXECUTE FUNCTION data_catalog.tg_status_object_restriction();
+
+COMMENT ON TRIGGER tg_status_object_restriction 
+ON data_catalog.tb_schemas 
+IS 'Trigger responsável por validar e restringir as transições de status dos objetos do catálogo lógico na tabela tb_schemas, assegurando que o workflow de governança seja respeitado.';
+
+-- Trigger responsável por validar e restringir as transições de status
+-- dos objetos do catálogo lógico na tabela tb_tables.
+-- Esta trigger impede que tabelas avancem no workflow sem descrição,
+-- periodicidade definida ou aprovação manual quando necessário.
+CREATE TRIGGER tg_status_object_restriction
+BEFORE UPDATE ON data_catalog.tb_tables
+FOR EACH ROW WHEN (NEW.tb_status_id IS DISTINCT FROM OLD.tb_status_id)
+EXECUTE FUNCTION data_catalog.tg_status_object_restriction();
+
+COMMENT ON TRIGGER tg_status_object_restriction 
+ON data_catalog.tb_tables 
+IS 'Trigger responsável por validar e restringir as transições de status dos objetos do catálogo lógico na tabela tb_tables, impedindo avanços sem descrição, periodicidade ou aprovação adequada.';
+
+-- Trigger responsável por validar e restringir as transições de status
+-- dos objetos do catálogo lógico na tabela tb_columns.
+-- Esta trigger garante que colunas só avancem no workflow quando
+-- possuírem descrição, tipo de dado válido e aprovação adequada.
+CREATE TRIGGER tg_status_object_restriction
+BEFORE UPDATE ON data_catalog.tb_columns
+FOR EACH ROW WHEN (NEW.tb_status_id IS DISTINCT FROM OLD.tb_status_id)
+EXECUTE FUNCTION data_catalog.tg_status_object_restriction();
+
+COMMENT ON TRIGGER tg_status_object_restriction 
+ON data_catalog.tb_columns 
+IS 'Trigger responsável por validar e restringir as transições de status dos objetos do catálogo lógico na tabela tb_columns, garantindo que colunas só avancem no workflow quando estiverem devidamente documentadas e aprovadas.';
