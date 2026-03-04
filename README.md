@@ -1,3 +1,8 @@
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-blue)
+![Status: Active](https://img.shields.io/badge/Status-Active-brightgreen)
+![Architecture: Medallion](https://img.shields.io/badge/Architecture-Medallion-orange)
+
 # PostgreSQL Medallion
 Automação e funções avançadas em PostgreSQL (plpgsql) para criação, gestão e governança de uma arquitetura medalhão (raw, bronze, silver, gold) em data warehouses. Inclui catálogo lógico, workflows de status e sincronização automática entre camadas.
 
