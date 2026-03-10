@@ -79,6 +79,21 @@ BEGIN
                         DEFAULT;
                     CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_tg_op"
                         ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" (tg_op, executed_at);
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_insert_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_insert" USING BRIN (executed_at)
+                        WITH (pages_per_range = 128);
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_update_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_update" USING BRIN (executed_at)
+                        WITH (pages_per_range = 128);
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_delete_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_delete" USING BRIN (executed_at)
+                        WITH (pages_per_range = 128);
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_truncate_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_truncate" USING BRIN (executed_at)
+                        WITH (pages_per_range = 128);
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_default_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_default" USING BRIN (executed_at)
+                        WITH (pages_per_range = 128);
                 $cmd$;
                 EXECUTE cmd;
 -- =============================================================
@@ -245,4 +260,3 @@ CREATE EVENT TRIGGER tg_audit_schemas_drop
 ON sql_drop
 WHEN tag IN ('DROP SCHEMA')
 EXECUTE PROCEDURE tg_audit_tables_drop();
-
