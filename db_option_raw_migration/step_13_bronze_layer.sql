@@ -17,6 +17,7 @@ DECLARE v_object_name VARCHAR(250);
 DECLARE v_object_description TEXT;
 DECLARE v_columns_pk VARCHAR;
 DECLARE v_columns_pk_check INTEGER;
+DECLARE v_table_has_pk BOOLEAN DEFAULT FALSE;
 BEGIN
 /*
     Função: data_catalog.bronze_layer
@@ -121,32 +122,50 @@ BEGIN
 		-- 
 		-- Este loop é responsável por atualizar o tb_status_id dos tb_tables que foram aprovados para camada bronze (status 2)
 		-- O novo status do objeto deverá ser 4 para entrar no motor de criação de objetos
+		--
+		-- IMPORTANTE: a tabela só será aprovada se ela possuir uma de suas colunas como sendo PK
 		-- ==================================================
 		FOR v_record IN
 			SELECT	DISTINCT
-					database_id
-					, database_name
-					, schema_id
-					, schema_name
-					, table_id
-					, table_name
-					, table_description
-			FROM data_catalog.vw_catalog
-			WHERE database_active IS TRUE
-			AND database_description IS NOT NULL
-			AND database_status_id IN (2,4,5)
-			AND schema_active IS TRUE
-			AND schema_description IS NOT NULL
-			AND schema_status_id IN (2,4,5)
-			AND table_active IS TRUE
-			AND table_description IS NOT NULL
-			AND table_payload_period_id IS NOT NULL
-			AND table_status_id = 2
-			AND column_active IS TRUE
-			AND column_description IS NOT NULL
-			AND column_data_type IS NOT NULL
-			AND column_status_id = 2
+					vw.database_id
+					, vw.database_name
+					, vw.schema_id
+					, vw.schema_name
+					, vw.table_id
+					, vw.table_name
+					, vw.table_description
+					, (CASE WHEN vw2.table_id IS NOT NULL THEN TRUE ELSE FALSE END) AS table_has_pk
+			FROM data_catalog.vw_catalog vw
+			JOIN LATERAL (
+				SELECT DISTINCT vw2.database_id, vw2.schema_id, vw2.table_id
+				FROM data_catalog.vw_catalog vw2
+				WHERE vw2.database_id = vw.database_id
+				AND vw2.schema_id = vw.schema_id
+				AND vw2.table_id = vw.table_id
+				AND vw2.column_pk IS TRUE
+			) vw2 
+				ON vw2.database_id = vw.database_id
+				AND vw2.schema_id = vw.schema_id
+				AND vw2.table_id = vw.table_id
+			WHERE vw.database_active IS TRUE
+			AND vw.database_description IS NOT NULL
+			AND vw.database_status_id IN (2,4,5)
+			AND vw.schema_active IS TRUE
+			AND vw.schema_description IS NOT NULL
+			AND vw.schema_status_id IN (2,4,5)
+			AND vw.table_active IS TRUE
+			AND vw.table_description IS NOT NULL
+			AND vw.table_payload_period_id IS NOT NULL
+			AND vw.table_status_id = 2
+			AND vw.column_active IS TRUE
+			AND vw.column_description IS NOT NULL
+			AND vw.column_data_type IS NOT NULL
+			AND vw.column_status_id = 2
 		LOOP
+			-- Depositamos nesta variável a condição da tabela obrigatoriamente possuir uma primary key
+			-- Com isso, liberamos ou não a criação de colunas na tabela.
+			v_table_has_pk := v_record.table_has_pk;
+			
 			UPDATE data_catalog.tb_tables SET 
 			tb_status_id = 4,
 			updated_at = clock_timestamp()
@@ -165,48 +184,52 @@ BEGIN
 		-- 
 		-- Este loop é responsável por atualizar o tb_status_id dos tb_columns que foram aprovados para camada bronze (status 2)
 		-- O novo status do objeto deverá ser 4 para entrar no motor de criação de objetos
+		--
+		-- Antes de iniciar, validamos se a tabela possui uma PK
 		-- ==================================================
-		FOR v_record IN
-			SELECT	DISTINCT
-					database_id
-					, database_name
-					, schema_id
-					, schema_name
-					, table_id
-					, table_name
-					, column_id
-					, column_name
-					, column_description
-			FROM data_catalog.vw_catalog
-			WHERE database_active IS TRUE
-			AND database_description IS NOT NULL
-			AND database_status_id IN (2,4,5)
-			AND schema_active IS TRUE
-			AND schema_description IS NOT NULL
-			AND schema_status_id IN (2,4,5)
-			AND table_active IS TRUE
-			AND table_description IS NOT NULL
-			AND table_payload_period_id IS NOT NULL
-			AND table_status_id IN (2,4,5)
-			AND column_active IS TRUE
-			AND column_description IS NOT NULL
-			AND column_data_type IS NOT NULL
-			AND column_status_id = 2
-		LOOP
-			UPDATE data_catalog.tb_columns SET 
-			tb_status_id = 4,
-			updated_at = clock_timestamp()
-			WHERE id = v_record.column_id
-			AND tb_tables_id = v_record.table_id
-			AND tb_schemas_id = v_record.schema_id
-			AND tb_databases_id = v_record.database_id;
-			RETURN QUERY
+		IF v_table_has_pk THEN
+			FOR v_record IN
 				SELECT	DISTINCT
-						'TO CREATE COLUMN'::VARCHAR AS object_type
-						, CONCAT(v_record.database_name,'.',v_record.schema_name,'.',v_record.table_name,'.',v_record.column_name)::VARCHAR AS object_name
-						, v_status_from AS object_status_from
-						, v_status_to AS object_status_to;
-		END LOOP;
+						database_id
+						, database_name
+						, schema_id
+						, schema_name
+						, table_id
+						, table_name
+						, column_id
+						, column_name
+						, column_description
+				FROM data_catalog.vw_catalog
+				WHERE database_active IS TRUE
+				AND database_description IS NOT NULL
+				AND database_status_id IN (2,4,5)
+				AND schema_active IS TRUE
+				AND schema_description IS NOT NULL
+				AND schema_status_id IN (2,4,5)
+				AND table_active IS TRUE
+				AND table_description IS NOT NULL
+				AND table_payload_period_id IS NOT NULL
+				AND table_status_id IN (2,4,5)
+				AND column_active IS TRUE
+				AND column_description IS NOT NULL
+				AND column_data_type IS NOT NULL
+				AND column_status_id = 2
+			LOOP
+				UPDATE data_catalog.tb_columns SET 
+				tb_status_id = 4,
+				updated_at = clock_timestamp()
+				WHERE id = v_record.column_id
+				AND tb_tables_id = v_record.table_id
+				AND tb_schemas_id = v_record.schema_id
+				AND tb_databases_id = v_record.database_id;
+				RETURN QUERY
+					SELECT	DISTINCT
+							'TO CREATE COLUMN'::VARCHAR AS object_type
+							, CONCAT(v_record.database_name,'.',v_record.schema_name,'.',v_record.table_name,'.',v_record.column_name)::VARCHAR AS object_name
+							, v_status_from AS object_status_from
+							, v_status_to AS object_status_to;
+			END LOOP;
+		END IF;
 
 -- --------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Determina o status de origem e destino com base no status atual do objeto. -- Cada bloco representa uma transição válida no fluxo de governança.
@@ -312,31 +335,47 @@ BEGIN
 		-- RAISE EXCEPTION 'ERRO NA CRIAÇÃO DA PK';
 		FOR v_record IN
 			SELECT	DISTINCT
-					database_id
-					, database_name
-					, schema_id
-					, schema_name
-					, table_id
-					, table_name
-					, table_description
-					, string_agg(CONCAT('"',column_name,'" ') || column_data_type,', ') AS table_columns
-			FROM data_catalog.vw_catalog
-			WHERE database_active IS TRUE
-			AND database_description IS NOT NULL
-			AND database_status_id IN (4,5)
-			AND schema_active IS TRUE
-			AND schema_description IS NOT NULL
-			AND schema_status_id IN (4,5)
-			AND table_active IS TRUE
-			AND table_description IS NOT NULL
-			AND table_payload_period_id IS NOT NULL
-			AND table_status_id = 4
-			AND column_active IS TRUE
-			AND column_description IS NOT NULL
-			AND column_data_type IS NOT NULL
-			AND column_status_id = 4
+					vw.database_id
+					, vw.database_name
+					, vw.schema_id
+					, vw.schema_name
+					, vw.table_id
+					, vw.table_name
+					, vw.table_description
+					, (CASE WHEN vw2.table_id IS NOT NULL THEN TRUE ELSE FALSE END) AS table_has_pk
+					, string_agg(CONCAT('"',vw.column_name,'" ') || vw.column_data_type,', ') AS table_columns
+			FROM data_catalog.vw_catalog vw
+			JOIN LATERAL (
+				SELECT DISTINCT vw2.database_id, vw2.schema_id, vw2.table_id
+				FROM data_catalog.vw_catalog vw2
+				WHERE vw2.database_id = vw.database_id
+				AND vw2.schema_id = vw.schema_id
+				AND vw2.table_id = vw.table_id
+				AND vw2.column_pk IS TRUE
+			) vw2 
+				ON vw2.database_id = vw.database_id
+				AND vw2.schema_id = vw.schema_id
+				AND vw2.table_id = vw.table_id
+			WHERE vw.database_active IS TRUE
+			AND vw.database_description IS NOT NULL
+			AND vw.database_status_id IN (4,5)
+			AND vw.schema_active IS TRUE
+			AND vw.schema_description IS NOT NULL
+			AND vw.schema_status_id IN (4,5)
+			AND vw.table_active IS TRUE
+			AND vw.table_description IS NOT NULL
+			AND vw.table_payload_period_id IS NOT NULL
+			AND vw.table_status_id = 4
+			AND vw.column_active IS TRUE
+			AND vw.column_description IS NOT NULL
+			AND vw.column_data_type IS NOT NULL
+			AND vw.column_status_id = 4
 			GROUP BY 1,2,3,4,5,6,7
 		LOOP
+			-- Depositamos nesta variável a condição da tabela obrigatoriamente possuir uma primary key
+			-- Com isso, liberamos ou não a criação de colunas na tabela.
+			v_table_has_pk := v_record.table_has_pk;
+			
 			-- Concatenação para formar o nome do novo schema existente na camada bronze
 			v_object_name := CONCAT(v_record.database_name,'_',v_record.schema_name);
 			
@@ -463,31 +502,42 @@ BEGIN
 		-- ==================================================
 		FOR v_record IN
 			SELECT	DISTINCT
-					database_id
-					, database_name
-					, schema_id
-					, schema_name
-					, table_id
-					, table_name
-					, column_id
-					, column_name
-					, column_data_type
-					, column_description
-			FROM data_catalog.vw_catalog
-			WHERE database_active IS TRUE
-			AND database_description IS NOT NULL
-			AND database_status_id = 5
-			AND schema_active IS TRUE
-			AND schema_description IS NOT NULL
-			AND schema_status_id = 5
-			AND table_active IS TRUE
-			AND table_description IS NOT NULL
-			AND table_payload_period_id IS NOT NULL
-			AND table_status_id = 5
-			AND column_active IS TRUE
-			AND column_description IS NOT NULL
-			AND column_data_type IS NOT NULL
-			AND column_status_id = 4
+					vw.database_id
+					, vw.database_name
+					, vw.schema_id
+					, vw.schema_name
+					, vw.table_id
+					, vw.table_name
+					, vw.column_id
+					, vw.column_name
+					, vw.column_data_type
+					, vw.column_description
+			FROM data_catalog.vw_catalog vw
+			JOIN LATERAL (
+				SELECT DISTINCT vw2.database_id, vw2.schema_id, vw2.table_id
+				FROM data_catalog.vw_catalog vw2
+				WHERE vw2.database_id = vw.database_id
+				AND vw2.schema_id = vw.schema_id
+				AND vw2.table_id = vw.table_id
+				AND vw2.column_pk IS TRUE
+			) vw2 
+				ON vw2.database_id = vw.database_id
+				AND vw2.schema_id = vw.schema_id
+				AND vw2.table_id = vw.table_id
+			WHERE vw.database_active IS TRUE
+			AND vw.database_description IS NOT NULL
+			AND vw.database_status_id = 5
+			AND vw.schema_active IS TRUE
+			AND vw.schema_description IS NOT NULL
+			AND vw.schema_status_id = 5
+			AND vw.table_active IS TRUE
+			AND vw.table_description IS NOT NULL
+			AND vw.table_payload_period_id IS NOT NULL
+			AND vw.table_status_id = 5
+			AND vw.column_active IS TRUE
+			AND vw.column_description IS NOT NULL
+			AND vw.column_data_type IS NOT NULL
+			AND vw.column_status_id = 4
 		LOOP
 			-- Concatenação para formar o nome do novo schema existente na camada bronze
 			v_object_name := CONCAT(v_record.database_name,'_',v_record.schema_name);
@@ -1189,5 +1239,4 @@ BEGIN
 	RETURN;
 END; 
 $BODY$;
-
 
