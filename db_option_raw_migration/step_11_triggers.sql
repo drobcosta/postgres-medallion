@@ -49,3 +49,47 @@ EXECUTE FUNCTION data_catalog.tg_status_object_restriction();
 COMMENT ON TRIGGER tg_status_object_restriction 
 ON data_catalog.tb_columns 
 IS 'Trigger responsável por validar e restringir as transições de status dos objetos do catálogo lógico na tabela tb_columns, garantindo que colunas só avancem no workflow quando estiverem devidamente documentadas e aprovadas.';
+
+-- Trigger responsável por tornar dinâmica a mudança de tb_status_id
+-- para todos os schemas, tabelas e colunas que dependem de tb_databases.
+-- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
+CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_databases
+FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
+EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('databases');
+
+COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
+ON data_catalog.tb_databases
+IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para todos os schemas, tabelas e colunas que dependem de tb_databases. Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6';
+
+-- Trigger responsável por tornar dinâmica a mudança de tb_status_id
+-- para todos os databases, tabelas e colunas que dependem de tb_schemas.
+-- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
+CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_schemas
+FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
+EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('schemas');
+
+COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
+ON data_catalog.tb_schemas
+IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para todos os databases, tabelas e colunas que dependem de tb_schemas. Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6';
+
+-- Trigger responsável por tornar dinâmica a mudança de tb_status_id
+-- para todos os databases, schemas e colunas que dependem de tb_tables.
+-- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
+CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_tables
+FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
+EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('tables');
+
+COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
+ON data_catalog.tb_tables
+IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para todos os databases, schemas e colunas que dependem de tb_tables. Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6';
+
+-- Trigger responsável por tornar dinâmica a mudança de tb_status_id
+-- para todos os databases, schemas e tabelas que dependem de tb_columns.
+-- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
+CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_columns
+FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
+EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('columns');
+
+COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
+ON data_catalog.tb_columns
+IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para todos os databases, schemas e tabelas que dependem de tb_columns. Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6';
