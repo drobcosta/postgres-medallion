@@ -334,8 +334,7 @@ BEGIN
 		-- ==================================================
 		-- RAISE EXCEPTION 'ERRO NA CRIAÇÃO DA PK';
 		FOR v_record IN
-			SELECT	DISTINCT
-					vw.database_id
+			SELECT	vw.database_id
 					, vw.database_name
 					, vw.schema_id
 					, vw.schema_name
@@ -370,7 +369,7 @@ BEGIN
 			AND vw.column_description IS NOT NULL
 			AND vw.column_data_type IS NOT NULL
 			AND vw.column_status_id = 4
-			GROUP BY 1,2,3,4,5,6,7
+			GROUP BY 1,2,3,4,5,6,7,8
 		LOOP
 			-- Depositamos nesta variável a condição da tabela obrigatoriamente possuir uma primary key
 			-- Com isso, liberamos ou não a criação de colunas na tabela.
@@ -1239,4 +1238,3 @@ BEGIN
 	RETURN;
 END; 
 $BODY$;
-
