@@ -1,6 +1,6 @@
-INSERT INTO data_catalog.tb_status ("name") VALUES ('NOVO OBJETO (ANALISAR)'),('APROVADO DATA PLATFORM'),('REPROVADO DATA PLATFORM'),('EM CRIAÇÃO DATA PLATFORM'),('DISPONÍVEL DATA PLATFORM'),('APROVADO PARA REMOÇÃO DATA PLATFORM'),('EM REMOÇÃO DATA PLATFORM'),('REMOVIDO DATA PLATFORM');
+INSERT INTO data_catalog.tb_status ("name", created_at) VALUES ('NOVO OBJETO (ANALISAR)',clock_timestamp()),('APROVADO DATA PLATFORM',clock_timestamp()),('REPROVADO DATA PLATFORM',clock_timestamp()),('EM CRIAÇÃO DATA PLATFORM',clock_timestamp()),('DISPONÍVEL DATA PLATFORM',clock_timestamp()),('APROVADO PARA REMOÇÃO DATA PLATFORM',clock_timestamp()),('EM REMOÇÃO DATA PLATFORM',clock_timestamp()),('REMOVIDO DATA PLATFORM',clock_timestamp());
 
-INSERT INTO data_catalog.tb_payload_period ("name",minutes) VALUES ('Every 5 minutes',5),('Every 10 minutes',10),('Every 30 minutes',30),('Every 1 hour',60),('Every 3 hours',180),('Every 6 hours',360),('Every 12 hours',720),('Every day',1444);
+INSERT INTO data_catalog.tb_payload_period ("name",minutes,created_at) VALUES ('Every 5 minutes',5,clock_timestamp()),('Every 10 minutes',10,clock_timestamp()),('Every 30 minutes',30,clock_timestamp()),('Every 1 hour',60,clock_timestamp()),('Every 3 hours',180,clock_timestamp()),('Every 6 hours',360,clock_timestamp()),('Every 12 hours',720,clock_timestamp()),('Every day',1444,clock_timestamp());
 
 INSERT INTO data_catalog.tb_data_types VALUES 
 ('SMALLINT'),
