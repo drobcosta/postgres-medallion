@@ -107,11 +107,11 @@ BEGIN
                     AS $tg$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
-                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op)
-                            VALUES (NULL, row_to_json(NEW.*), current_user, TG_OP);
+                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
+                            VALUES (NULL, row_to_json(NEW.*), current_user, TG_OP, clock_timestamp());
                         ELSE
-                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op)
-                            VALUES (row_to_json(OLD.*), row_to_json(NEW.*), current_user, TG_OP);
+                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
+                            VALUES (row_to_json(OLD.*), row_to_json(NEW.*), current_user, TG_OP, clock_timestamp());
                         END IF;
                        
                         RETURN NEW;
