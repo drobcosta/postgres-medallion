@@ -36,6 +36,7 @@ BEGIN
 		---> APROVADO DATA PLATFORM
 		---> REPROVADO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 2 AND NEW.tb_status_id IN (4) AND NEW.description IS NOT NULL THEN
 		/*
@@ -43,6 +44,7 @@ BEGIN
 		PERMITE UPDATE APENAS PARA OS STATUS:
 		---> EM CRIAÇÃO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 3 AND NEW.tb_status_id IN (1,2) AND NEW.description IS NOT NULL THEN
 		/*
@@ -51,6 +53,7 @@ BEGIN
 		---> NOVO OBJETO (ANALISAR)
 		---> APROVADO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 4 AND NEW.tb_status_id IN (5) AND NEW.description IS NOT NULL THEN
 		/*
@@ -58,6 +61,7 @@ BEGIN
 		PERMITE UPDATE APENAS PARA OS STATUS:
 		---> DISPONÍVEL DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 5 AND NEW.tb_status_id IN (6) AND NEW.description IS NOT NULL THEN
 		/*
@@ -65,6 +69,7 @@ BEGIN
 		PERMITE UPDATE APENAS PARA OS STATUS:
 		---> APROVADO PARA REMOÇÃO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 6 AND NEW.tb_status_id IN (7) AND NEW.description IS NOT NULL THEN
 		/*
@@ -72,6 +77,7 @@ BEGIN
 		PERMITE UPDATE APENAS PARA OS STATUS:
 		---> EM REMOÇÃO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 7 AND NEW.tb_status_id IN (8) AND NEW.description IS NOT NULL THEN
 		/*
@@ -79,6 +85,7 @@ BEGIN
 		PERMITE UPDATE APENAS PARA OS STATUS:
 		---> REMOVIDO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSIF OLD.tb_status_id = 8 AND NEW.tb_status_id IN (1,2) AND NEW.description IS NOT NULL THEN
 		/*
@@ -87,6 +94,7 @@ BEGIN
 		---> NOVO OBJETO (ANALISAR)
 		---> APROVADO DATA PLATFORM
 		*/
+		NEW.updated_at := clock_timestamp();
 		RETURN NEW;
 	ELSE
 		RETURN NULL;
@@ -149,40 +157,46 @@ BEGIN
 				IF NEW.tb_status_id = 3 THEN
 					UPDATE data_catalog.tb_schemas SET 
 					tb_status_id = 3,
-					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', NEW.name))
+					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', NEW.name)),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.id;
 	
 					UPDATE data_catalog.tb_tables SET 
 					tb_status_id = 3,
 					description = COALESCE(description, CONCAT('[automatic description process] table ', name, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day'))
+					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day')),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.id;
 	
 					UPDATE data_catalog.tb_columns SET 
 					tb_status_id = 3,
 					description = COALESCE(description, CONCAT('[automatic description process] coluna ', name, ' from table ', tb_tables_id, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					data_type = COALESCE(data_type,'TEXT')
+					data_type = COALESCE(data_type,'TEXT'),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.id;
 
 					RETURN NEW;
 				ELSIF NEW.tb_status_id = 6 THEN
 					UPDATE data_catalog.tb_schemas SET 
 					tb_status_id = 6,
-					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', NEW.name))
+					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', NEW.name)),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.id
 					AND tb_status_id = 5;
 	
 					UPDATE data_catalog.tb_tables SET 
 					tb_status_id = 6,
 					description = COALESCE(description, CONCAT('[automatic description process] table ', name, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day'))
+					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day')),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.id
 					AND tb_status_id = 5;
 	
 					UPDATE data_catalog.tb_columns SET 
 					tb_status_id = 6,
 					description = COALESCE(description, CONCAT('[automatic description process] coluna ', name, ' from table ', tb_tables_id, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					data_type = COALESCE(data_type,'TEXT')
+					data_type = COALESCE(data_type,'TEXT'),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.id
 					AND tb_status_id = 5;
 	
@@ -194,7 +208,8 @@ BEGIN
 				IF NEW.tb_status_id = 2 THEN
 					UPDATE data_catalog.tb_databases SET 
 					tb_status_id = 2,
-					description = COALESCE(description, CONCAT('[automatic description process] database ', name))
+					description = COALESCE(description, CONCAT('[automatic description process] database ', name)),
+					updated_at = clock_timestamp()
 					WHERE id = NEW.tb_databases_id
 					AND tb_status_id IN (1,3);
 	
@@ -203,14 +218,16 @@ BEGIN
 					UPDATE data_catalog.tb_tables SET 
 					tb_status_id = 3,
 					description = COALESCE(description, CONCAT('[automatic description process] table ', name, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day'))
+					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day')),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.id;
 	
 					UPDATE data_catalog.tb_columns SET 
 					tb_status_id = 3,
 					description = COALESCE(description, CONCAT('[automatic description process] coluna ', name, ' from table ', tb_tables_id, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					data_type = COALESCE(data_type,'TEXT')
+					data_type = COALESCE(data_type,'TEXT'),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.id;
 	
@@ -219,7 +236,8 @@ BEGIN
 					UPDATE data_catalog.tb_tables SET 
 					tb_status_id = 6,
 					description = COALESCE(description, CONCAT('[automatic description process] table ', name, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day'))
+					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day')),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.id
 					AND tb_status_id = 5;
@@ -227,7 +245,8 @@ BEGIN
 					UPDATE data_catalog.tb_columns SET 
 					tb_status_id = 6,
 					description = COALESCE(description, CONCAT('[automatic description process] coluna ', name, ' from table ', tb_tables_id, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					data_type = COALESCE(data_type,'TEXT')
+					data_type = COALESCE(data_type,'TEXT'),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.id
 					AND tb_status_id = 5;
@@ -240,13 +259,15 @@ BEGIN
 				IF NEW.tb_status_id = 2 THEN
 					UPDATE data_catalog.tb_databases SET 
 					tb_status_id = 2,
-					description = COALESCE(description, CONCAT('[automatic description process] database ', name))
+					description = COALESCE(description, CONCAT('[automatic description process] database ', name)),
+					updated_at = clock_timestamp()
 					WHERE id = NEW.tb_databases_id
 					AND tb_status_id IN (1,3);
 	
 					UPDATE data_catalog.tb_schemas SET 
 					tb_status_id = 2,
-					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', tb_databases_id))
+					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', tb_databases_id)),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND id = NEW.tb_schemas_id
 					AND tb_status_id IN (1,3);
@@ -256,7 +277,8 @@ BEGIN
 					UPDATE data_catalog.tb_columns SET 
 					tb_status_id = 3,
 					description = COALESCE(description, CONCAT('[automatic description process] coluna ', name, ' from table ', tb_tables_id, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					data_type = COALESCE(data_type,'TEXT')
+					data_type = COALESCE(data_type,'TEXT'),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.tb_schemas_id
 					AND tb_tables_id = NEW.id;
@@ -266,7 +288,8 @@ BEGIN
 					UPDATE data_catalog.tb_columns SET 
 					tb_status_id = 6,
 					description = COALESCE(description, CONCAT('[automatic description process] coluna ', name, ' from table ', tb_tables_id, ' from schema ', tb_schemas_id, ' from database ', NEW.name)),
-					data_type = COALESCE(data_type,'TEXT')
+					data_type = COALESCE(data_type,'TEXT'),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.tb_schemas_id
 					AND tb_tables_id = NEW.id
@@ -280,13 +303,15 @@ BEGIN
 				IF NEW.tb_status_id = 2 THEN
 					UPDATE data_catalog.tb_databases SET 
 					tb_status_id = 2,
-					description = COALESCE(description, CONCAT('[automatic description process] database ', name))
+					description = COALESCE(description, CONCAT('[automatic description process] database ', name)),
+					updated_at = clock_timestamp()
 					WHERE id = NEW.tb_databases_id
 					AND tb_status_id IN (1,3);
 	
 					UPDATE data_catalog.tb_schemas SET 
 					tb_status_id = 2,
-					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', tb_databases_id))
+					description = COALESCE(description, CONCAT('[automatic description process] schema ', name, ' from database ', tb_databases_id)),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND id = NEW.tb_schemas_id
 					AND tb_status_id IN (1,3);
@@ -294,7 +319,8 @@ BEGIN
 					UPDATE data_catalog.tb_tables SET 
 					tb_status_id = 2,
 					description = COALESCE(description, CONCAT('[automatic description process] table ', name, ' from schema ', tb_schemas_id, ' from database ', tb_databases_id)),
-					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day'))
+					tb_payload_period_id = COALESCE(tb_payload_period_id, (SELECT max(id) FROM data_catalog.tb_payload_period WHERE "name" = 'Every day')),
+					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND tb_schemas_id = NEW.tb_schemas_id
 					AND id = NEW.tb_tables_id
