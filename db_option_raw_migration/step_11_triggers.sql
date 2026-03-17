@@ -55,7 +55,7 @@ IS 'Trigger responsável por validar e restringir as transições de status dos 
 -- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
 CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_databases
 FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
-EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('databases');
+EXECUTE PROCEDURE data_catalog.tg_catalog_object_status_change_hierarchy('databases');
 
 COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
 ON data_catalog.tb_databases
@@ -66,7 +66,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para to
 -- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
 CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_schemas
 FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
-EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('schemas');
+EXECUTE PROCEDURE data_catalog.tg_catalog_object_status_change_hierarchy('schemas');
 
 COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
 ON data_catalog.tb_schemas
@@ -77,7 +77,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para to
 -- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
 CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_tables
 FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
-EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('tables');
+EXECUTE PROCEDURE data_catalog.tg_catalog_object_status_change_hierarchy('tables');
 
 COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
 ON data_catalog.tb_tables
@@ -88,7 +88,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para to
 -- Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6
 CREATE TRIGGER tg_catalog_object_status_change_hierarchy BEFORE UPDATE ON data_catalog.tb_columns
 FOR EACH ROW WHEN (NEW.tb_status_id IN (2,3,6))
-EXECUTE PROCEDURE data_catalog.catalog_object_status_change_hierarchy('columns');
+EXECUTE PROCEDURE data_catalog.tg_catalog_object_status_change_hierarchy('columns');
 
 COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
 ON data_catalog.tb_columns
