@@ -97,7 +97,7 @@ $BODY$;
 
 COMMENT ON FUNCTION data_catalog.tg_status_object_restriction() IS 'Função responsável por validar regras para a mudança correta entre os status (tb_status_id) de cada tabela de objetos (tb_databases, tb_schemas, tb_tables e tb_columns). Também responsável por restringir a mudança incorreta entre os status (tb_status_id) de cada tabela de objetos (tb_databases, tb_schemas, tb_tables e tb_columns) obedecendo a ordem exata de mudança de status.';
 
-CREATE OR REPLACE FUNCTION data_catalog.catalog_object_status_change_hierarchy()
+CREATE OR REPLACE FUNCTION data_catalog.tg_catalog_object_status_change_hierarchy()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER AS $BODY$
@@ -315,4 +315,4 @@ BEGIN
 	RETURN NULL;
 END; $BODY$;
 
-COMMENT ON FUNCTION data_catalog.catalog_object_status_change_hierarchy() IS 'Função responsável por tornar dinâmica a mudança de tb_status_id para todos os objetos de acordo com a hierarquia deles. Só é válida para updates nos status 2, 3 e 6. Mudanças em tb_databases para o status 3 ou 6 alterará todos os objetos que dependem de tb_databases. Mudanças em tb_schemas para o status 2 também forçará a mudança para o status 2 para o tb_databases caso o tb_status_id de tb_databases seja 1. Mudanças em tb_schemas para os status 3 ou 6 vai alterar os objetos dependentes a ele desde que estejam nos tb_status_id 1 (para mudanças para tb_status_id 3) e 5 (para mudanças para tb_status_id 6). Tabelas e colunas seguem o mesmo padrão. Para tb_status_id = 2, muda a hierarquia superior. Para tb_status_id 3 ou 6, muda a hierarquia inferior.';
+COMMENT ON FUNCTION data_catalog.tg_catalog_object_status_change_hierarchy() IS 'Função responsável por tornar dinâmica a mudança de tb_status_id para todos os objetos de acordo com a hierarquia deles. Só é válida para updates nos status 2, 3 e 6. Mudanças em tb_databases para o status 3 ou 6 alterará todos os objetos que dependem de tb_databases. Mudanças em tb_schemas para o status 2 também forçará a mudança para o status 2 para o tb_databases caso o tb_status_id de tb_databases seja 1. Mudanças em tb_schemas para os status 3 ou 6 vai alterar os objetos dependentes a ele desde que estejam nos tb_status_id 1 (para mudanças para tb_status_id 3) e 5 (para mudanças para tb_status_id 6). Tabelas e colunas seguem o mesmo padrão. Para tb_status_id = 2, muda a hierarquia superior. Para tb_status_id 3 ou 6, muda a hierarquia inferior.';
