@@ -156,7 +156,7 @@ BEGIN
 			AND vw.table_active IS TRUE
 			AND vw.table_description IS NOT NULL
 			AND vw.table_payload_period_id IS NOT NULL
-			AND vw.table_status_id = 2
+			AND vw.table_status_id IN (2,4,5)
 			AND vw.column_active IS TRUE
 			AND vw.column_description IS NOT NULL
 			AND vw.column_data_type IS NOT NULL
