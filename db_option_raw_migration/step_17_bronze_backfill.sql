@@ -1,7 +1,19 @@
-CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_inserts(p_databases_id VARCHAR DEFAULT NULL, p_schemas_id VARCHAR DEFAULT NULL, p_tables_id VARCHAR DEFAULT NULL, p_columns_id VARCHAR DEFAULT NULL)
-RETURNS SETOF data_catalog.bronze_backfill_control
-LANGUAGE plpgsql
-SECURITY DEFINER AS $BODY$
+-- FUNCTION: data_catalog.bronze_backfill_inserts(character varying, character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS data_catalog.bronze_backfill_inserts(character varying, character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_inserts(
+	p_databases_id character varying DEFAULT NULL::character varying,
+	p_schemas_id character varying DEFAULT NULL::character varying,
+	p_tables_id character varying DEFAULT NULL::character varying,
+	p_columns_id character varying DEFAULT NULL::character varying)
+    RETURNS SETOF data_catalog.bronze_backfill_control 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
 -- VARIÁVEIS AUXILIARES E DE CONTROLE
 DECLARE v_record RECORD;
 DECLARE v_cmd VARCHAR;
@@ -275,6 +287,26 @@ BEGIN
 	-- [OBRIGATÓRIO] p_columns_id IS NOT NULL
 	ELSIF p_databases_id IS NOT NULL AND p_schemas_id IS NOT NULL AND p_tables_id IS NOT NULL AND p_columns_id IS NOT NULL THEN
 
+		-- Ainda não desenvolvido. Mas será para fazer um fullcharge de apenas 1 coluna.
+		-- Retornamos uma query vazia
+		RETURN QUERY
+			SELECT	null::INTEGER AS id
+					, null::VARCHAR(32) AS tb_databases_id
+					, null::VARCHAR(32) AS tb_schemas_id
+					, null::VARCHAR(32) AS tb_tables_id
+					, null::VARCHAR(32) AS tb_columns_id
+					, null::INTEGER AS payload_limit
+					, null::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+					, null::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+					, null::BOOLEAN AS insert_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+					, null::BOOLEAN AS update_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+					, null::BOOLEAN AS delete_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
+					, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
+			RETURN;
+
 	END IF;
 
 -- ======================================================================================================================================================
@@ -297,12 +329,25 @@ BEGIN
 				, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
 				, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
 		RETURN;
-END; $BODY$;
+END; 
+$BODY$;
 
-CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_updates(p_databases_id VARCHAR DEFAULT NULL, p_schemas_id VARCHAR DEFAULT NULL, p_tables_id VARCHAR DEFAULT NULL, p_columns_id VARCHAR DEFAULT NULL)
-RETURNS SETOF data_catalog.bronze_backfill_control
-LANGUAGE plpgsql
-SECURITY DEFINER AS $BODY$
+-- FUNCTION: data_catalog.bronze_backfill_updates(character varying, character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS data_catalog.bronze_backfill_updates(character varying, character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_updates(
+	p_databases_id character varying DEFAULT NULL::character varying,
+	p_schemas_id character varying DEFAULT NULL::character varying,
+	p_tables_id character varying DEFAULT NULL::character varying,
+	p_columns_id character varying DEFAULT NULL::character varying)
+    RETURNS SETOF data_catalog.bronze_backfill_control 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
 -- VARIÁVEIS AUXILIARES E DE CONTROLE
 DECLARE v_record RECORD;
 DECLARE v_cmd VARCHAR;
@@ -575,6 +620,26 @@ BEGIN
 	-- [OBRIGATÓRIO] p_columns_id IS NOT NULL
 	ELSIF p_databases_id IS NOT NULL AND p_schemas_id IS NOT NULL AND p_tables_id IS NOT NULL AND p_columns_id IS NOT NULL THEN
 
+		-- Ainda não desenvolvido. Mas será para fazer um fullcharge de apenas 1 coluna.
+		-- Retornamos uma query vazia
+		RETURN QUERY
+			SELECT	null::INTEGER AS id
+					, null::VARCHAR(32) AS tb_databases_id
+					, null::VARCHAR(32) AS tb_schemas_id
+					, null::VARCHAR(32) AS tb_tables_id
+					, null::VARCHAR(32) AS tb_columns_id
+					, null::INTEGER AS payload_limit
+					, null::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+					, null::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+					, null::BOOLEAN AS insert_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+					, null::BOOLEAN AS update_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+					, null::BOOLEAN AS delete_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
+					, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
+			RETURN;
+
 	END IF;
 
 -- ======================================================================================================================================================
@@ -597,12 +662,25 @@ BEGIN
 				, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
 				, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
 		RETURN;
-END; $BODY$;
+END; 
+$BODY$;
 
-CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_deletes(p_databases_id VARCHAR DEFAULT NULL, p_schemas_id VARCHAR DEFAULT NULL, p_tables_id VARCHAR DEFAULT NULL, p_columns_id VARCHAR DEFAULT NULL)
-RETURNS SETOF data_catalog.bronze_backfill_control
-LANGUAGE plpgsql
-SECURITY DEFINER AS $BODY$
+-- FUNCTION: data_catalog.bronze_backfill_deletes(character varying, character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS data_catalog.bronze_backfill_deletes(character varying, character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_deletes(
+	p_databases_id character varying DEFAULT NULL::character varying,
+	p_schemas_id character varying DEFAULT NULL::character varying,
+	p_tables_id character varying DEFAULT NULL::character varying,
+	p_columns_id character varying DEFAULT NULL::character varying)
+    RETURNS SETOF data_catalog.bronze_backfill_control 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
 -- VARIÁVEIS AUXILIARES E DE CONTROLE
 DECLARE v_record RECORD;
 DECLARE v_cmd VARCHAR;
@@ -755,6 +833,8 @@ BEGIN
 					v_delete_timestamp := v_record.delete_timestamp;
 				END IF;
 
+				-- RAISE EXCEPTION '%', v_delete_timestamp;
+
 				-- Criando de forma dinâmica uma comparação para ser usada na cláusula WHERE entre as PKs
 				SELECT	CONCAT('(',string_agg(CONCAT('bronze."',column_name,'"'),', '),')') AS bronze_columns_pk
 						, CONCAT('(',string_agg(CONCAT('ds."',column_name,'"'),', '),')') AS hstlog_columns_pk
@@ -798,6 +878,8 @@ BEGIN
 					FROM bronze_registry, backfill_registry
 					GROUP BY 1
 				$cmd$;
+
+				-- RAISE EXCEPTION '%', v_cmd;
 
 				IF v_cmd IS NOT NULL THEN
 					EXECUTE v_cmd INTO v_delete_timestamp, v_qty;
@@ -852,6 +934,26 @@ BEGIN
 	-- [OBRIGATÓRIO] p_columns_id IS NOT NULL
 	ELSIF p_databases_id IS NOT NULL AND p_schemas_id IS NOT NULL AND p_tables_id IS NOT NULL AND p_columns_id IS NOT NULL THEN
 
+		-- Ainda não desenvolvido. Mas será para fazer um fullcharge de apenas 1 coluna.
+		-- Retornamos uma query vazia
+		RETURN QUERY
+			SELECT	null::INTEGER AS id
+					, null::VARCHAR(32) AS tb_databases_id
+					, null::VARCHAR(32) AS tb_schemas_id
+					, null::VARCHAR(32) AS tb_tables_id
+					, null::VARCHAR(32) AS tb_columns_id
+					, null::INTEGER AS payload_limit
+					, null::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+					, null::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+					, null::BOOLEAN AS insert_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+					, null::BOOLEAN AS update_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+					, null::BOOLEAN AS delete_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
+					, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
+			RETURN;
+
 	END IF;
 
 -- ======================================================================================================================================================
@@ -874,12 +976,23 @@ BEGIN
 				, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
 				, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
 		RETURN;
-END; $BODY$;
+END; 
+$BODY$;
 
-CREATE OR REPLACE FUNCTION data_catalog.backfill_done(p_databases_id VARCHAR DEFAULT NULL, p_schemas_id VARCHAR DEFAULT NULL, p_tables_id VARCHAR DEFAULT NULL, p_columns_id VARCHAR DEFAULT NULL)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER AS $BODY$
+-- FUNCTION: data_catalog.backfill_done(character varying, character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS data_catalog.backfill_done(character varying, character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION data_catalog.backfill_done(
+	p_databases_id character varying DEFAULT NULL::character varying,
+	p_schemas_id character varying DEFAULT NULL::character varying,
+	p_tables_id character varying DEFAULT NULL::character varying,
+	p_columns_id character varying DEFAULT NULL::character varying)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+AS $BODY$
 DECLARE v_backfill_done BOOLEAN DEFAULT false;
 BEGIN
 	-- CHECKING backfill_control está tudo como DONE
@@ -929,12 +1042,25 @@ BEGIN
 	INTO v_backfill_done;
 
 	RETURN v_backfill_done;
-END; $BODY$;
+END; 
+$BODY$;
 
-CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill(p_databases_id VARCHAR DEFAULT NULL, p_schemas_id VARCHAR DEFAULT NULL, p_tables_id VARCHAR DEFAULT NULL, p_columns_id VARCHAR DEFAULT NULL)
-RETURNS SETOF data_catalog.bronze_backfill_control
-LANGUAGE plpgsql
-SECURITY DEFINER AS $BODY$
+-- FUNCTION: data_catalog.bronze_backfill(character varying, character varying, character varying, character varying)
+
+-- DROP FUNCTION IF EXISTS data_catalog.bronze_backfill(character varying, character varying, character varying, character varying);
+
+CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill(
+	p_databases_id character varying DEFAULT NULL::character varying,
+	p_schemas_id character varying DEFAULT NULL::character varying,
+	p_tables_id character varying DEFAULT NULL::character varying,
+	p_columns_id character varying DEFAULT NULL::character varying)
+    RETURNS SETOF data_catalog.bronze_backfill_control 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
 -- VARIÁVEIS AUXILIARES E DE CONTROLE
 DECLARE v_record RECORD;
 DECLARE v_record_objects RECORD;
@@ -1089,6 +1215,26 @@ BEGIN
 	-- [OBRIGATÓRIO] p_tables_id IS NOT NULL
 	-- [OBRIGATÓRIO] p_columns_id IS NOT NULL
 	ELSIF p_databases_id IS NOT NULL AND p_schemas_id IS NOT NULL AND p_tables_id IS NOT NULL AND p_columns_id IS NOT NULL THEN
+
+		-- Ainda não desenvolvido. Mas será para fazer um fullcharge de apenas 1 coluna.
+		-- Retornamos uma query vazia
+		RETURN QUERY
+			SELECT	null::INTEGER AS id
+					, null::VARCHAR(32) AS tb_databases_id
+					, null::VARCHAR(32) AS tb_schemas_id
+					, null::VARCHAR(32) AS tb_tables_id
+					, null::VARCHAR(32) AS tb_columns_id
+					, null::INTEGER AS payload_limit
+					, null::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+					, null::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+					, null::BOOLEAN AS insert_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+					, null::BOOLEAN AS update_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+					, null::BOOLEAN AS delete_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
+					, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
+			RETURN;
 
 -- ======================================================================================================================================================
 	-- Loop em todas as tabelas que precisam de fullcharge
@@ -1290,4 +1436,5 @@ BEGIN
 				, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
 				, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
 		RETURN;
-END; $BODY$;
+END; 
+$BODY$;
