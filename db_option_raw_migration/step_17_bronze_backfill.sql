@@ -1018,7 +1018,7 @@ BEGIN
 			tb_databases_id,
 			tb_schemas_id,
 			tb_tables_id,
-			start_timestamp,
+			target_timestamp,
 			insert_qty,
 			update_qty,
 			delete_qty,
