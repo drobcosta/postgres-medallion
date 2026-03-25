@@ -139,6 +139,39 @@ BEGIN
 					v_cmd := $cmd$ SELECT MIN(executed_at) FROM $cmd$ || v_record.hstlog_insert_path;
 					IF v_cmd IS NOT NULL THEN
 						EXECUTE v_cmd INTO v_insert_timestamp;
+						IF v_insert_timestamp IS NULL THEN
+							v_insert_timestamp := v_record.target_timestamp;
+							
+							-- Atualizando a tabela bronze_backfill_control
+							-- Se na query em loop a coluna bronze_layer_control_id view NULL, então é um novo registro para controlarmos
+							IF v_record.bronze_layer_control_id IS NULL THEN
+								INSERT INTO data_catalog.bronze_backfill_control (
+									tb_databases_id
+									, tb_schemas_id
+									, tb_tables_id
+									, payload_limit
+									, target_timestamp
+									, insert_timestamp
+									, insert_done
+									, created_at
+								) VALUES (
+									v_record.database_id
+									, v_record.schema_id
+									, v_record.table_id
+									, v_payload_limit
+									, v_target_timestamp
+									, v_insert_timestamp
+									, (CASE WHEN v_insert_timestamp >= v_target_timestamp THEN true ELSE false END)
+									, clock_timestamp()
+								);
+							ELSE
+								UPDATE data_catalog.bronze_backfill_control SET
+								insert_timestamp = COALESCE(v_insert_timestamp,insert_timestamp),
+								insert_done = true,
+								updated_at = clock_timestamp()
+								WHERE id = v_record.bronze_layer_control_id;
+							END IF;
+						END IF;
 					END IF;
 				ELSE
 					v_insert_timestamp := v_record.insert_timestamp;
@@ -403,13 +436,21 @@ BEGIN
 			-- ======================================================================================================================================================
 			-- ======================================================================================================================================================
 			IF v_record.update_done IS NULL OR v_record.update_done IS FALSE THEN
-
 				-- Coletando a data de referência para o chunk
 				-- Caso esteja nula, a data utilizada será a primeira data encontrada na tabela histórica
 				IF v_record.update_timestamp IS NULL THEN
 					v_cmd := $cmd$ SELECT MIN(executed_at) FROM $cmd$ || v_record.hstlog_update_path;
 					IF v_cmd IS NOT NULL THEN
 						EXECUTE v_cmd INTO v_update_timestamp;
+						IF v_update_timestamp IS NULL THEN
+							v_update_timestamp := v_record.target_timestamp;
+							
+							UPDATE data_catalog.bronze_backfill_control SET
+							update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
+							update_done = true,
+							updated_at = clock_timestamp()
+							WHERE id = v_record.bronze_layer_control_id;
+						END IF;
 					END IF;
 				ELSE
 					v_update_timestamp := v_record.update_timestamp;
@@ -700,12 +741,19 @@ BEGIN
 					v_cmd := $cmd$ SELECT MIN(executed_at) FROM $cmd$ || v_record.hstlog_delete_path;
 					IF v_cmd IS NOT NULL THEN
 						EXECUTE v_cmd INTO v_delete_timestamp;
+						IF v_delete_timestamp IS NULL THEN
+							v_delete_timestamp := v_record.target_timestamp;
+							
+							UPDATE data_catalog.bronze_backfill_control SET
+							delete_timestamp = COALESCE(v_delete_timestamp,delete_timestamp),
+							delete_done = true,
+							updated_at = clock_timestamp()
+							WHERE id = v_record.bronze_layer_control_id;
+						END IF;
 					END IF;
 				ELSE
 					v_delete_timestamp := v_record.delete_timestamp;
 				END IF;
-
-				-- RAISE EXCEPTION '%', v_delete_timestamp;
 
 				-- Criando de forma dinâmica uma comparação para ser usada na cláusula WHERE entre as PKs
 				SELECT	CONCAT('(',string_agg(CONCAT('bronze."',column_name,'"'),', '),')') AS bronze_columns_pk
@@ -750,8 +798,6 @@ BEGIN
 					FROM bronze_registry, backfill_registry
 					GROUP BY 1
 				$cmd$;
-
-				-- RAISE EXCEPTION '%', v_cmd;
 
 				IF v_cmd IS NOT NULL THEN
 					EXECUTE v_cmd INTO v_delete_timestamp, v_qty;
@@ -1131,7 +1177,7 @@ BEGIN
 				AND vw.schema_id = v_record_objects.schema_id
 				AND vw.table_id = v_record_objects.table_id
 			LOOP
-			
+
 				-- ======================================================================================================================================================
 				IF v_record.insert_done IS NULL OR v_record.insert_done IS FALSE THEN
 					RETURN QUERY
@@ -1151,9 +1197,9 @@ BEGIN
 								, created_at::TIMESTAMP WITHOUT TIME ZONE AS created_at
 								, updated_at::TIMESTAMP WITHOUT TIME ZONE AS updated_at
 							FROM data_catalog.bronze_backfill_inserts(
-								v_record_objects.database_id,
-								v_record_objects.schema_id,
-								v_record_objects.table_id,
+								v_record.database_id,
+								v_record.schema_id,
+								v_record.table_id,
 								NULL
 							);
 	
@@ -1176,9 +1222,9 @@ BEGIN
 								, created_at::TIMESTAMP WITHOUT TIME ZONE AS created_at
 								, updated_at::TIMESTAMP WITHOUT TIME ZONE AS updated_at
 							FROM data_catalog.bronze_backfill_updates(
-								v_record_objects.database_id,
-								v_record_objects.schema_id,
-								v_record_objects.table_id,
+								v_record.database_id,
+								v_record.schema_id,
+								v_record.table_id,
 								NULL
 							);
 	
@@ -1201,18 +1247,18 @@ BEGIN
 								, created_at::TIMESTAMP WITHOUT TIME ZONE AS created_at
 								, updated_at::TIMESTAMP WITHOUT TIME ZONE AS updated_at
 							FROM data_catalog.bronze_backfill_deletes(
-								v_record_objects.database_id,
-								v_record_objects.schema_id,
-								v_record_objects.table_id,
+								v_record.database_id,
+								v_record.schema_id,
+								v_record.table_id,
 								NULL
 							);
 				END IF;
 	
 				SELECT backfill_done
 				FROM data_catalog.backfill_done(
-					v_record_objects.database_id, 
-					v_record_objects.schema_id, 
-					v_record_objects.table_id, 
+					v_record.database_id, 
+					v_record.schema_id, 
+					v_record.table_id, 
 					null
 				) backfill_done
 				INTO v_backfill_done;
