@@ -891,6 +891,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER AS $BODY$
 -- VARIÁVEIS AUXILIARES E DE CONTROLE
 DECLARE v_record RECORD;
+DECLARE v_record_objects RECORD;
 DECLARE v_cmd VARCHAR;
 DECLARE v_backfill_done BOOLEAN;
 BEGIN
@@ -1051,6 +1052,176 @@ BEGIN
 	-- [OBRIGATÓRIO] p_columns_id IS NULL
 	ELSIF p_databases_id IS NULL AND p_schemas_id IS NULL AND p_tables_id IS NULL AND p_columns_id IS NULL THEN
 
+		FOR v_record_objects IN
+			SELECT	DISTINCT
+					vw.database_id
+					, vw.schema_id
+					, vw.table_id
+			FROM data_catalog.vw_catalog vw
+			LEFT JOIN data_catalog.bronze_layer_control blc
+				ON blc.tb_databases_id = vw.database_id
+				AND blc.tb_schemas_id = vw.schema_id
+				AND blc.tb_tables_id = vw.table_id
+			LEFT JOIN data_catalog.bronze_backfill_control bbc
+				ON bbc.tb_databases_id = vw.database_id
+				AND bbc.tb_schemas_id = vw.schema_id
+				AND bbc.tb_tables_id = vw.table_id
+				AND bbc.tb_columns_id IS NULL
+			WHERE vw.database_status_id = 5
+			AND vw.schema_status_id = 5
+			AND vw.table_status_id = 5
+			AND blc.tb_tables_id IS NULL
+			AND (
+				bbc.id IS NULL OR (
+					bbc.insert_done IS FALSE
+					OR bbc.update_done IS FALSE
+					OR bbc.delete_done IS FALSE
+				)
+			)
+		LOOP
+
+			FOR v_record IN
+				SELECT	DISTINCT
+						vw.database_id
+						, vw.database_name
+						, vw.schema_id
+						, vw.schema_name
+						, vw.table_id
+						, vw.table_name
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'"') AS bronze_schema_name
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw"') AS raw_schema_name
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw_hstlog"') AS hstlog_schema_name
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'"."',vw.table_name,'"') AS bronze_path
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw"."',vw.table_name,'"') AS raw_path
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw_hstlog"."',vw.table_name,'_hstlog"') AS hstlog_path
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw_hstlog"."',vw.table_name,'_hstlog_insert"') AS hstlog_insert_path
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw_hstlog"."',vw.table_name,'_hstlog_update"') AS hstlog_update_path
+						, CONCAT('"',vw.database_name,'_',vw.schema_name,'_raw_hstlog"."',vw.table_name,'_hstlog_delete"') AS hstlog_delete_path
+						, bbc.id AS bronze_layer_control_id
+						, bbc.payload_limit
+						, bbc.target_timestamp
+						, bbc.insert_timestamp
+						, bbc.insert_done
+						, bbc.update_timestamp
+						, bbc.update_done
+						, bbc.delete_timestamp
+						, bbc.delete_done
+				FROM data_catalog.vw_catalog vw
+				LEFT JOIN data_catalog.bronze_layer_control blc
+					ON blc.tb_databases_id = vw.database_id
+					AND blc.tb_schemas_id = vw.schema_id
+					AND blc.tb_tables_id = vw.table_id
+				LEFT JOIN data_catalog.bronze_backfill_control bbc
+					ON bbc.tb_databases_id = vw.database_id
+					AND bbc.tb_schemas_id = vw.schema_id
+					AND bbc.tb_tables_id = vw.table_id
+					AND bbc.tb_columns_id IS NULL
+				WHERE vw.database_status_id = 5
+				AND vw.schema_status_id = 5
+				AND vw.table_status_id = 5
+				AND blc.tb_tables_id IS NULL
+				AND (
+					bbc.id IS NULL OR (
+						bbc.insert_done IS FALSE
+						OR bbc.update_done IS FALSE
+						OR bbc.delete_done IS FALSE
+					)
+				)
+				AND vw.database_id = v_record_objects.database_id
+				AND vw.schema_id = v_record_objects.schema_id
+				AND vw.table_id = v_record_objects.table_id
+			LOOP
+			
+				-- ======================================================================================================================================================
+				IF v_record.insert_done IS NULL OR v_record.insert_done IS FALSE THEN
+					RETURN QUERY
+						SELECT	id::INTEGER AS id
+								, tb_databases_id::VARCHAR(32) AS tb_databases_id
+								, tb_schemas_id::VARCHAR(32) AS tb_schemas_id
+								, tb_tables_id::VARCHAR(32) AS tb_tables_id
+								, tb_columns_id::VARCHAR(32) AS tb_columns_id
+								, payload_limit::INTEGER AS payload_limit
+								, target_timestamp::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+								, insert_timestamp::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+								, insert_done::BOOLEAN AS insert_done
+								, update_timestamp::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+								, update_done::BOOLEAN AS update_done
+								, delete_timestamp::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+								, delete_done::BOOLEAN AS delete_done
+								, created_at::TIMESTAMP WITHOUT TIME ZONE AS created_at
+								, updated_at::TIMESTAMP WITHOUT TIME ZONE AS updated_at
+							FROM data_catalog.bronze_backfill_inserts(
+								v_record_objects.database_id,
+								v_record_objects.schema_id,
+								v_record_objects.table_id,
+								NULL
+							);
+	
+				-- ======================================================================================================================================================
+				ELSIF v_record.update_done IS NULL OR v_record.update_done IS FALSE THEN
+					RETURN QUERY
+						SELECT	id::INTEGER AS id
+								, tb_databases_id::VARCHAR(32) AS tb_databases_id
+								, tb_schemas_id::VARCHAR(32) AS tb_schemas_id
+								, tb_tables_id::VARCHAR(32) AS tb_tables_id
+								, tb_columns_id::VARCHAR(32) AS tb_columns_id
+								, payload_limit::INTEGER AS payload_limit
+								, target_timestamp::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+								, insert_timestamp::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+								, insert_done::BOOLEAN AS insert_done
+								, update_timestamp::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+								, update_done::BOOLEAN AS update_done
+								, delete_timestamp::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+								, delete_done::BOOLEAN AS delete_done
+								, created_at::TIMESTAMP WITHOUT TIME ZONE AS created_at
+								, updated_at::TIMESTAMP WITHOUT TIME ZONE AS updated_at
+							FROM data_catalog.bronze_backfill_updates(
+								v_record_objects.database_id,
+								v_record_objects.schema_id,
+								v_record_objects.table_id,
+								NULL
+							);
+	
+				-- ======================================================================================================================================================
+				ELSIF v_record.delete_done IS NULL OR v_record.delete_done IS FALSE THEN
+					RETURN QUERY
+						SELECT	id::INTEGER AS id
+								, tb_databases_id::VARCHAR(32) AS tb_databases_id
+								, tb_schemas_id::VARCHAR(32) AS tb_schemas_id
+								, tb_tables_id::VARCHAR(32) AS tb_tables_id
+								, tb_columns_id::VARCHAR(32) AS tb_columns_id
+								, payload_limit::INTEGER AS payload_limit
+								, target_timestamp::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+								, insert_timestamp::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+								, insert_done::BOOLEAN AS insert_done
+								, update_timestamp::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+								, update_done::BOOLEAN AS update_done
+								, delete_timestamp::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+								, delete_done::BOOLEAN AS delete_done
+								, created_at::TIMESTAMP WITHOUT TIME ZONE AS created_at
+								, updated_at::TIMESTAMP WITHOUT TIME ZONE AS updated_at
+							FROM data_catalog.bronze_backfill_deletes(
+								v_record_objects.database_id,
+								v_record_objects.schema_id,
+								v_record_objects.table_id,
+								NULL
+							);
+				END IF;
+	
+				SELECT backfill_done
+				FROM data_catalog.backfill_done(
+					v_record_objects.database_id, 
+					v_record_objects.schema_id, 
+					v_record_objects.table_id, 
+					null
+				) backfill_done
+				INTO v_backfill_done;
+				
+			END LOOP;
+
+		END LOOP;
+
+		RETURN;
 	END IF;
 
 -- ======================================================================================================================================================
@@ -1074,4 +1245,3 @@ BEGIN
 				, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
 		RETURN;
 END; $BODY$;
-
