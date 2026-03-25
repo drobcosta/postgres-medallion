@@ -81,6 +81,110 @@ Localizado no schema `data_catalog`, contém:
 
 Esse catálogo é o **cérebro da plataforma**, responsável por governança, documentação e orquestração.
 
+#### 1.1 Tabelas do Catálogo
+
+##### 1.1.1 `tb_status` — Workflow de Governança
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | SERIAL (PK) | Identificador |
+| name | VARCHAR(100) | Nome do status |
+| created_at | TIMESTAMP | Timestamp de criação |
+
+**Registros padrão:**  
+NOVO OBJETO, APROVADO, REPROVADO, EM CRIAÇÃO, DISPONÍVEL, APROVADO PARA REMOÇÃO, EM REMOÇÃO, REMOVIDO.
+
+##### 1.1.2 `tb_payload_period` — Periodicidade de Carga
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | SERIAL (PK) | Identificador |
+| name | VARCHAR(100) | Nome do período |
+| minutes | INTEGER | Intervalo em minutos |
+| created_at | TIMESTAMP | Timestamp de criação |
+
+**Registros padrão:**  
+5, 10, 30, 60, 180, 360, 720, 1444 minutos.
+
+##### 1.1.3 `tb_databases` — Catálogo de Bancos
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | VARCHAR(32) (PK) | MD5 do nome |
+| tb_status_id | INTEGER (FK) | Status |
+| name | VARCHAR(250) | Nome |
+| description | VARCHAR(250) | Obrigatória |
+| active | BOOLEAN | Ativo/inativo |
+| created_at | TIMESTAMP | Inserção |
+| updated_at | TIMESTAMP | Última mudança |
+
+##### 1.1.4 `tb_schemas` — Catálogo de Schemas
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | VARCHAR(32) (PK) | MD5 do nome |
+| tb_databases_id | VARCHAR(32) (PK, FK) | Database pai |
+| tb_status_id | INTEGER (FK) | Status |
+| name | VARCHAR(250) | Nome |
+| description | VARCHAR(250) | Obrigatória |
+| active | BOOLEAN | Ativo/inativo |
+| created_at | TIMESTAMP | Inserção |
+| updated_at | TIMESTAMP | Última mudança |
+
+##### 1.1.5 `tb_tables` — Catálogo de Tabelas
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | VARCHAR(32) (PK) | MD5 do nome |
+| tb_databases_id | VARCHAR(32) (PK, FK) | Database pai |
+| tb_schemas_id | VARCHAR(32) (PK, FK) | Schema pai |
+| tb_status_id | INTEGER (FK) | Status |
+| tb_payload_period_id | INTEGER (FK) | Periodicidade |
+| name | VARCHAR(250) | Nome |
+| description | VARCHAR(250) | Obrigatória |
+| active | BOOLEAN | Ativo/inativo |
+| created_at | TIMESTAMP | Inserção |
+| updated_at | TIMESTAMP | Última mudança |
+
+##### 1.1.6 `tb_data_types` — Tipos de Dados Permitidos
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| data_type | VARCHAR (PK) | Tipo permitido |
+
+**Inclui:**  
+SMALLINT, INTEGER, BIGINT, NUMERIC, DECIMAL, VARCHAR, TEXT, DATE, TIMESTAMP, BOOLEAN, JSON, JSONB, UUID, MONEY, INET.
+
+##### 1.1.7 `tb_columns` — Catálogo de Colunas
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | VARCHAR(32) (PK) | MD5 do nome |
+| tb_databases_id | VARCHAR(32) (PK, FK) | Database pai |
+| tb_schemas_id | VARCHAR(32) (PK, FK) | Schema pai |
+| tb_tables_id | VARCHAR(32) (PK, FK) | Tabela pai |
+| tb_status_id | INTEGER (FK) | Status |
+| name | VARCHAR(250) | Nome |
+| description | VARCHAR(250) | Obrigatória |
+| data_type | VARCHAR(100) (FK) | Tipo original |
+| is_pk | BOOLEAN | Indica PK |
+| active | BOOLEAN | Ativo/inativo |
+| created_at | TIMESTAMP | Inserção |
+| updated_at | TIMESTAMP | Última mudança |
+
+##### 1.1.8 View Consolidada — `vw_catalog`
+
+A view unifica:
+
+* Databases
+* Schemas  
+* Tabelas  
+* Colunas  
+* Status  
+* Periodicidade  
+* Tipos de dados  
+* Flags de atividade
+
 ---
 
 ### 2. Ingestão Automática de Metadados RAW
@@ -138,6 +242,37 @@ Para que os objetos sejam aprovados para mudança de tb_status_id, algumas regra
 Uma vez que os objetos estão aprovados e entram no Workflow, eles poderão entrar no motor de separação (apenas alteração para um tb_status_id intermediário) para criação ou remoção da camada bronze como também em operações de criação ou remoção do objeto na camada bronze.
 
 Função responsável pela engenharia do Workflow: `data_catalog.bronze_layer`
+
+#### 3.1 Fluxo Completo Raw → Bronze
+
+```mermaid
+flowchart TD
+
+A[NOVO OBJETO] -->|Aprovar| B[APROVADO]
+A -->|Reprovar| C[REPROVADO]
+
+B -->|Criar Bronze| D[EM CRIAÇÃO]
+D -->|Concluído| E[DISPONÍVEL]
+
+E -->|Solicitar Remoção| F[APROVADO PARA REMOÇÃO]
+F -->|Remover| G[EM REMOÇÃO]
+G -->|Concluído| H[REMOVIDO]
+H -->|Recriar| A
+H -->|Aprovar direto| B
+```
+
+#### 3.2 Regras de Governança
+
+```
+NOVO OBJETO → {NOVO OBJETO, APROVADO, REPROVADO}
+APROVADO → {EM CRIAÇÃO}
+REPROVADO → {NOVO OBJETO, APROVADO}
+EM CRIAÇÃO → {DISPONÍVEL}
+DISPONÍVEL → {APROVADO PARA REMOÇÃO}
+APROVADO PARA REMOÇÃO → {EM REMOÇÃO}
+EM REMOÇÃO → {REMOVIDO}
+REMOVIDO → {NOVO OBJETO, APROVADO}
+```
 
 ---
 
