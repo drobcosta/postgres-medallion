@@ -996,7 +996,7 @@ AS $BODY$
 DECLARE v_backfill_done BOOLEAN DEFAULT false;
 BEGIN
 	-- CHECKING backfill_control está tudo como DONE
-	-- Se SIM, insert into data_catalog.bronze_layer_control
+	-- Se SIM, insert into data_catalog.bronze_layer_payload_control
 	WITH backfill_done AS (
 		SELECT	id
 				, tb_databases_id
@@ -1013,8 +1013,8 @@ BEGIN
 		AND update_done IS TRUE
 		AND delete_done IS TRUE
 	)
-	, bronze_layer_control_add AS (
-		INSERT INTO data_catalog.bronze_layer_control(
+	, bronze_layer_payload_control_add AS (
+		INSERT INTO data_catalog.bronze_layer_payload_control(
 			tb_databases_id,
 			tb_schemas_id,
 			tb_tables_id,
@@ -1037,7 +1037,7 @@ BEGIN
 	)
 	SELECT COALESCE((
 		SELECT DISTINCT true
-		FROM bronze_layer_control_add
+		FROM bronze_layer_payload_control_add
 	), false)
 	INTO v_backfill_done;
 
