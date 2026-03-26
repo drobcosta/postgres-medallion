@@ -1443,6 +1443,10 @@ $BODY$;
 
 -- DROP VIEW data_catalog.vw_bronze_backfill;
 
+-- View: data_catalog.vw_bronze_backfill
+
+-- DROP VIEW data_catalog.vw_bronze_backfill;
+
 CREATE OR REPLACE VIEW data_catalog.vw_bronze_backfill
  AS
  SELECT DISTINCT vw.database_id,
@@ -1458,6 +1462,6 @@ CREATE OR REPLACE VIEW data_catalog.vw_bronze_backfill
     bbc.delete_timestamp,
     bbc.delete_done
    FROM data_catalog.vw_catalog vw
-     LEFT JOIN data_catalog.bronze_layer_control blc ON blc.tb_databases_id::text = vw.database_id::text AND blc.tb_schemas_id::text = vw.schema_id::text AND blc.tb_tables_id::text = vw.table_id::text
+     LEFT JOIN data_catalog.bronze_layer_payload_control blpc ON blpc.tb_databases_id::text = vw.database_id::text AND blpc.tb_schemas_id::text = vw.schema_id::text AND blpc.tb_tables_id::text = vw.table_id::text
      LEFT JOIN data_catalog.bronze_backfill_control bbc ON bbc.tb_databases_id::text = vw.database_id::text AND bbc.tb_schemas_id::text = vw.schema_id::text AND bbc.tb_tables_id::text = vw.table_id::text AND bbc.tb_columns_id IS NULL
-  WHERE vw.database_status_id = 5 AND vw.schema_status_id = 5 AND vw.table_status_id = 5 AND blc.tb_tables_id IS NULL AND (bbc.id IS NULL OR bbc.insert_done IS FALSE OR bbc.update_done IS FALSE OR bbc.delete_done IS FALSE);
+  WHERE vw.database_status_id = 5 AND vw.schema_status_id = 5 AND vw.table_status_id = 5 AND blpc.tb_tables_id IS NULL AND (bbc.id IS NULL OR bbc.insert_done IS FALSE OR bbc.update_done IS FALSE OR bbc.delete_done IS FALSE);
