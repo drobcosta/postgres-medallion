@@ -1018,9 +1018,11 @@ BEGIN
 			tb_databases_id,
 			tb_schemas_id,
 			tb_tables_id,
-			target_timestamp,
+			insert_timestamp,
 			insert_qty,
+			update_timestamp,
 			update_qty,
+			delete_timestamp,
 			delete_qty,
 			created_at
 		)
@@ -1029,7 +1031,9 @@ BEGIN
 				, tb_tables_id
 				, target_timestamp
 				, 0
+				, target_timestamp
 				, 0
+				, target_timestamp
 				, 0
 				, created_at
 		FROM backfill_done
