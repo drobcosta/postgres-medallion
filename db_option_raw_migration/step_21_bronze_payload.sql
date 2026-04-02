@@ -234,6 +234,7 @@ DECLARE v_minutes_safety_margin INTEGER;
 DECLARE v_target_timestamp TIMESTAMP;
 DECLARE v_target_timestamp_safety_margin TIMESTAMP;
 DECLARE v_hstlog_columns VARCHAR;
+DECLARE v_hstlog_columns_old VARCHAR;
 DECLARE v_bronze_columns_pk VARCHAR;
 DECLARE v_hstlog_columns_pk VARCHAR;
 DECLARE v_bronze_raw_columns VARCHAR;
@@ -350,6 +351,7 @@ BEGIN
 
 		-- HSTLOG COLUMNS
 		SELECT	string_agg(CONCAT('("',table_name,'_new"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_columns
+				, string_agg(CONCAT('("',table_name,'_old"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_columns_old
 		FROM (
 			SELECT table_name, column_name, data_type
 			FROM information_schema.columns
@@ -357,7 +359,7 @@ BEGIN
 			AND table_name = v_record.table_name
 			ORDER BY ordinal_position
 		) columns
-		INTO v_hstlog_columns;
+		INTO v_hstlog_columns, v_hstlog_columns_old;
 
 		-- GERANDO DINAMICAMENTE UMA ATRIBUIÇÃO ENTRE AS COLUNAS COM ALIAS DA QUERY DE UPDATE
 		-- COLUNA1 = DS.COLUNA1
@@ -410,6 +412,13 @@ BEGIN
 				FROM $cmd$ || v_record.hstlog_update_path || $cmd$
 				WHERE executed_at::TIMESTAMP(0) >= '$cmd$ || v_target_timestamp_safety_margin || $cmd$'
 				ORDER BY executed_at ASC
+			)
+			, datasource_old AS (
+				SELECT	$cmd$ || REPLACE(v_hstlog_columns,'_new"->>','_old"->>') || $cmd$
+						, executed_at
+				FROM $cmd$ || v_record.hstlog_update_path || $cmd$
+				WHERE executed_at::TIMESTAMP(0) >= '$cmd$ || v_target_timestamp_safety_margin || $cmd$'
+				ORDER BY executed_at ASC
 			), new_target_timestamp AS (
 				SELECT MAX(executed_at) AS executed_at
 				FROM datasource
@@ -417,7 +426,10 @@ BEGIN
 				UPDATE $cmd$ || v_record.bronze_path || $cmd$ bronze SET
 				$cmd$ || v_bronze_raw_columns || $cmd$
 				FROM datasource ds
+				JOIN datasource_old ds_old
+					ON $cmd$ || v_hstlog_columns_pk || $cmd$ = $cmd$ || REPLACE(v_hstlog_columns_pk,'ds.','ds_old.') || $cmd$
 				WHERE $cmd$ || v_bronze_columns_pk || $cmd$ = $cmd$ || v_hstlog_columns_pk || $cmd$
+				AND bronze.$cmd$|| REPLACE(REPLACE(v_bronze_raw_columns,'ds.','ds_old.'),', ',' AND bronze.') || $cmd$
 				RETURNING $cmd$ || v_bronze_columns_pk || $cmd$
 			)
 			SELECT ntt.executed_at, COUNT(op.*)
