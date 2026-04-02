@@ -1,17 +1,35 @@
-CREATE OR REPLACE FUNCTION data_catalog.raw_into_catalog()
-RETURNS TABLE (
-	object_type VARCHAR,
-	object_qty BIGINT
-)
-LANGUAGE plpgsql
-SECURITY DEFINER AS $BODY$
+CREATE SEQUENCE IF NOT EXISTS data_catalog.tb_raw_into_catalog_id_seq
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+CREATE TABLE IF NOT EXISTS data_catalog.tb_raw_into_catalog
+(
+    id bigint NOT NULL DEFAULT nextval('data_catalog.tb_raw_into_catalog_id_seq'::regclass),
+    object_type character varying COLLATE pg_catalog."default",
+    object_qty bigint,
+    payload_timestamp timestamp without time zone,
+    CONSTRAINT tb_raw_into_catalog_pkey PRIMARY KEY (id)
+);
+
+CREATE OR REPLACE FUNCTION data_catalog.raw_into_catalog(
+	)
+    RETURNS TABLE(object_type character varying, object_qty bigint) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
 BEGIN
 	RETURN QUERY
 		WITH raw_data AS (
-			SELECT	MD5(REGEXP_REPLACE(c.table_schema,'(_public|_raw)', '', 'g')) AS database_id
-					, REGEXP_REPLACE(c.table_schema,'(_public|_raw)', '', 'g') AS database_name
-					, MD5(REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,'(_public|_raw)', '', 'g'),'')),'(raw|_)', '', 'g')) AS schema_id
-					, REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,'(_public|_raw)', '', 'g'),'')),'(raw|_)', '', 'g') AS schema_name
+			SELECT	MD5(REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g')) AS database_id
+					, REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g') AS database_name
+					, MD5(REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g'),'')),tb_raw_patterns.pattern, '', 'g')) AS schema_id
+					, REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g'),'')),tb_raw_patterns.pattern, '', 'g') AS schema_name
 					, MD5(c.table_name) AS table_id
 					, c.table_name AS table_name
 					, cl.relkind AS table_type
@@ -25,9 +43,26 @@ BEGIN
 				ON cl.relnamespace = sch.oid
 				AND cl.relname = c.table_name
 				AND cl.relkind = 'r'
+			CROSS JOIN (
+				SELECT CONCAT('(', string_agg(patterns.pattern,'|'), ')') AS pattern
+				FROM (
+					SELECT tb_raw_patterns.pattern
+					FROM data_catalog.tb_raw_patterns
+					UNION ALL
+					SELECT '_' AS pattern
+				) patterns
+			) tb_raw_patterns
+			CROSS JOIN (
+				SELECT CONCAT('(', string_agg(patterns.pattern,'|'), ')') AS pattern
+				FROM (
+					SELECT trp.pattern FROM data_catalog.tb_raw_patterns trp
+					UNION
+					SELECT trdsep.pattern FROM data_catalog.tb_raw_databases_schemas_excluded_patterns trdsep
+				) patterns
+			) tb_raw_databases_schemas_excluded_patterns
 			LEFT JOIN data_catalog.tb_columns tc
-				ON tc.tb_databases_id = MD5(REGEXP_REPLACE(c.table_schema,'(_public|_raw)', '', 'g'))
-				AND tc.tb_schemas_id = MD5(REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,'(_public|_raw)', '', 'g'),'')),'(raw|_)', '', 'g'))
+				ON tc.tb_databases_id = MD5(REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g'))
+				AND tc.tb_schemas_id = MD5(REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g'),'')),tb_raw_patterns.pattern, '', 'g'))
 				AND tc.tb_tables_id = MD5(c.table_name)
 				AND tc.id = MD5(c.column_name)
 			LEFT JOIN LATERAL (
@@ -47,7 +82,8 @@ BEGIN
 				AND pk_columns.table_name = c.table_name
 				AND pk_columns.column_name = c.column_name
 			WHERE c.table_schema NOT IN ('information_schema','pg_catalog')
-			AND c.table_schema LIKE '%_raw'
+			AND c.table_schema LIKE ANY (SELECT '%' || tb_raw_patterns.pattern FROM data_catalog.tb_raw_patterns)
+			AND NULLIF(REGEXP_REPLACE((REPLACE(c.table_schema,REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g'),'')),tb_raw_patterns.pattern, '', 'g'),'') IS NOT NULL
 			AND tc.id IS NULL
 			ORDER BY 2,4,6
 		)
@@ -122,13 +158,26 @@ BEGIN
 			ON CONFLICT (id, tb_databases_id, tb_schemas_id, tb_tables_id) DO NOTHING
 			RETURNING tb_databases_id, tb_schemas_id, tb_tables_id, id
 		)
-		SELECT objects.object::VARCHAR, objects.qty::BIGINT
-		FROM (
-			SELECT 1 AS ordem, 'databases' AS object, COUNT(*) AS qty FROM tb_databases_add UNION ALL
-			SELECT 2 AS ordem, 'schemas' AS object, COUNT(*) AS qty FROM tb_schemas_add UNION ALL
-			SELECT 3 AS ordem, 'tables' AS object, COUNT(*) AS qty FROM tb_tables_add UNION ALL
-			SELECT 4 AS ordem, 'columns' AS object, COUNT(*) AS qty FROM tb_columns_add
-		) objects
-		ORDER BY objects.ordem;
+		, tb_raw_into_catalog_add AS (
+			INSERT INTO data_catalog.tb_raw_into_catalog (object_type,object_qty,payload_timestamp)
+			SELECT objects.object::VARCHAR, objects.qty::BIGINT, CURRENT_TIMESTAMP
+			FROM (
+				SELECT 1 AS ordem, 'databases' AS object, COUNT(*) AS qty FROM tb_databases_add UNION ALL
+				SELECT 2 AS ordem, 'schemas' AS object, COUNT(*) AS qty FROM tb_schemas_add UNION ALL
+				SELECT 3 AS ordem, 'tables' AS object, COUNT(*) AS qty FROM tb_tables_add UNION ALL
+				SELECT 4 AS ordem, 'columns' AS object, COUNT(*) AS qty FROM tb_columns_add
+			) objects
+			WHERE NOT (
+				((SELECT COUNT(*) FROM tb_databases_add) = 0)
+				AND ((SELECT COUNT(*) FROM tb_schemas_add) = 0)
+				AND ((SELECT COUNT(*) FROM tb_tables_add) = 0)
+				AND ((SELECT COUNT(*) FROM tb_columns_add) = 0)
+			)
+			ORDER BY objects.ordem
+			RETURNING tb_raw_into_catalog.object_type, tb_raw_into_catalog.object_qty
+		)
+		SELECT objects.object_type::VARCHAR, objects.object_qty::BIGINT
+		FROM tb_raw_into_catalog_add objects;
 	RETURN;
-END; $BODY$;
+END; 
+$BODY$;

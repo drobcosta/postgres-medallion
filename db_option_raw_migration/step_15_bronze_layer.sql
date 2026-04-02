@@ -397,8 +397,8 @@ BEGIN
 
 			SELECT COUNT(tc.*)
 			FROM information_schema.table_constraints tc
-			WHERE tc.table_schema = 'qd_leads_db_public'
-			AND tc.table_name = 'lds_leads'
+			WHERE tc.table_schema = v_object_name
+			AND tc.table_name = v_record.table_name
 			AND tc.constraint_type = 'PRIMARY KEY'
 			INTO v_columns_pk_check;
 

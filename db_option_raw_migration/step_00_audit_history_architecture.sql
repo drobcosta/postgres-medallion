@@ -19,15 +19,16 @@ DROP FUNCTION IF EXISTS tg_audit_tables_add();
 -- FUNÇÃO RESPONSÁVEL PELA CAPTAÇÃO DO EVENTO DE "CREATE TABLE", DESDE QUE NÃO SEJA UMA TABELA DE AUDITORIA/HISTÓRICO, PARA CRIAR SUA ESTRUTURA DE AUDITORIA/HISTÓRICO
 -- A ESTRUTURA DE AUDITORIA/HISTÓRICO SERÁ AUTOMATICAMENTE CRIADA E GERENCIADA EM UM SCHEMA NOVO, COM O MESMO NOME DO SCHEMA DA TABELA QUE ESTÁ SENDO CRIADA PORÉM COM O SUFIXO DE _HSTLOG (EX.: PUBLIC -> PUBLIC_HSTLOG)
 -- A TABELA RESPONSÁVEL PELA AUDITORIA/HISTÓRICO DA NOVA TABELA QUE ESTÁ SENDO CRIADA SERÁ PARTICIONADA EM 5 (SUFIXOS: _INSERT, _UPDATE, _DELETE, _TRUNCATE, _DEFAULT)
-CREATE OR REPLACE FUNCTION tg_audit_tables_add()
-RETURNS EVENT_TRIGGER
-SECURITY DEFINER
-LANGUAGE PLPGSQL
-AS $$
+CREATE OR REPLACE FUNCTION public.tg_audit_tables_add()
+    RETURNS event_trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE NOT LEAKPROOF SECURITY DEFINER
+AS $BODY$
 DECLARE sch_hstlog VARCHAR;
 DECLARE sch VARCHAR;
 DECLARE tbl VARCHAR;
-DECLARE tblprefix VARCHAR DEFAULT '_hstlog';
+DECLARE tblsuffix VARCHAR DEFAULT '_auditlog';
 DECLARE parent VARCHAR;
 DECLARE cmd VARCHAR;
 DECLARE obj RECORD;
@@ -37,11 +38,11 @@ BEGIN
     LOOP
         IF obj.object_type = 'table' THEN
             sch := REPLACE(obj.schema_name,'"','');
-            sch_hstlog := CONCAT(sch,tblprefix);
+            sch_hstlog := CONCAT(sch,tblsuffix);
             tbl := REPLACE(split_part(obj.object_identity,'.',2),'"','');
             SELECT inhparent::VARCHAR FROM pg_inherits WHERE inhrelid = obj.objid INTO parent;
             
-            IF tbl NOT LIKE '%_hstlog' AND parent IS NULL THEN
+            IF tbl NOT LIKE '%_' || tblsuffix AND parent IS NULL THEN
 -- =============================================================
 -- SCHEMA
 -- =============================================================
@@ -54,7 +55,7 @@ BEGIN
 -- TABLE
 -- =============================================================
                 cmd := $cmd$
-                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" (
+                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" (
                         id bigserial,
                         "$cmd$ || tbl || $cmd$_old" jsonb,
                         "$cmd$ || tbl || $cmd$_new" jsonb,
@@ -62,37 +63,37 @@ BEGIN
                         tg_op varchar,
                         executed_at timestamp without time zone not null default current_timestamp
                     ) PARTITION BY LIST(tg_op);
-                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_insert"
-                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"
+                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_insert"
+                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
                         FOR VALUES IN ('INSERT');
-                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_update"
-                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"
+                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_update"
+                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
                         FOR VALUES IN ('UPDATE');
-                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_delete"
-                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"
+                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_delete"
+                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
                         FOR VALUES IN ('DELETE');
-                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_truncate"
-                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"
+                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_truncate"
+                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
                         FOR VALUES IN ('TRUNCATE');
-                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_default"
-                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"
+                    CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_default"
+                        PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
                         DEFAULT;
-                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_tg_op"
-                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" (tg_op, executed_at);
-                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_insert_brin"
-                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_insert" USING BRIN (executed_at)
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_tg_op"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" (tg_op, executed_at);
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_insert_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_insert" USING BRIN (executed_at)
                         WITH (pages_per_range = 128);
-                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_update_brin"
-                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_update" USING BRIN (executed_at)
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_update_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_update" USING BRIN (executed_at)
                         WITH (pages_per_range = 128);
-                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_delete_brin"
-                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_delete" USING BRIN (executed_at)
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_delete_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_delete" USING BRIN (executed_at)
                         WITH (pages_per_range = 128);
-                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_truncate_brin"
-                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_truncate" USING BRIN (executed_at)
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_truncate_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_truncate" USING BRIN (executed_at)
                         WITH (pages_per_range = 128);
-                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_default_brin"
-                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$_default" USING BRIN (executed_at)
+                    CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_default_brin"
+                        ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_default" USING BRIN (executed_at)
                         WITH (pages_per_range = 128);
                 $cmd$;
                 EXECUTE cmd;
@@ -100,17 +101,17 @@ BEGIN
 -- FUNCTION TRIGGER
 -- =============================================================
                 cmd := $cmd$
-                    CREATE OR REPLACE FUNCTION "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"()
+                    CREATE OR REPLACE FUNCTION "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"()
                     RETURNS TRIGGER
                     SECURITY INVOKER
                     LANGUAGE PLPGSQL
                     AS $tg$
                     BEGIN
                         IF TG_OP = 'INSERT' THEN
-                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
+                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
                             VALUES (NULL, row_to_json(NEW.*), current_user, TG_OP, clock_timestamp());
                         ELSE
-                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
+                            INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
                             VALUES (row_to_json(OLD.*), row_to_json(NEW.*), current_user, TG_OP, clock_timestamp());
                         END IF;
                        
@@ -128,11 +129,11 @@ BEGIN
                     JOIN pg_namespace sc ON sc.oid = tb.relnamespace
                     WHERE sc.nspname = sch
                     AND tb.relname = tbl
-                    AND tg.tgname = CONCAT('tg_',tbl,tblprefix)
+                    AND tg.tgname = CONCAT('tg_',tbl,tblsuffix)
                 ) THEN
                     cmd := $cmd$
-                        CREATE TRIGGER "tg_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" AFTER INSERT OR UPDATE OR DELETE ON "$cmd$ || sch || $cmd$"."$cmd$ || tbl || $cmd$"
-                        FOR EACH ROW EXECUTE PROCEDURE "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"();
+                        CREATE TRIGGER "tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" AFTER INSERT OR UPDATE OR DELETE ON "$cmd$ || sch || $cmd$"."$cmd$ || tbl || $cmd$"
+                        FOR EACH ROW EXECUTE PROCEDURE "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"();
                     $cmd$;
                     EXECUTE cmd;
                 END IF;
@@ -140,7 +141,7 @@ BEGIN
 -- VIEW
 -- =============================================================
                 cmd := $cmd$
-                    CREATE OR REPLACE VIEW "$cmd$ || sch_hstlog || $cmd$"."vw_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" AS (
+                    CREATE OR REPLACE VIEW "$cmd$ || sch_hstlog || $cmd$"."vw_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" AS (
                         WITH changes AS (
                             SELECT  id,
                                     "$cmd$ || tbl || $cmd$_old",
@@ -154,7 +155,7 @@ BEGIN
                                     tg_usr,
                                     tg_op,
                                     executed_at
-                            FROM "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"
+                            FROM "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
                         ), changes_and_fields AS (
                             SELECT  id,
                                     "$cmd$ || tbl || $cmd$_old",
@@ -180,18 +181,20 @@ BEGIN
         END IF;
     END LOOP;
 
-END; $$;
+END; 
+$BODY$;
 
 -- FUNÇÃO RESPONSÁVEL POR REMOVER A ESTRUTURA DE AUDITORIA/HISTÓRICO DE TABELAS QUE ESTÃO SENDO REMOVIDAS DO AMBIENTE
-CREATE OR REPLACE FUNCTION tg_audit_tables_drop()
-RETURNS EVENT_TRIGGER
-SECURITY DEFINER
-LANGUAGE PLPGSQL
-AS $$
+CREATE OR REPLACE FUNCTION public.tg_audit_tables_drop()
+    RETURNS event_trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE NOT LEAKPROOF SECURITY DEFINER
+AS $BODY$
 DECLARE sch_hstlog VARCHAR;
 DECLARE sch VARCHAR;
 DECLARE tbl VARCHAR;
-DECLARE tblprefix VARCHAR DEFAULT '_hstlog';
+DECLARE tblsuffix VARCHAR DEFAULT '_auditlog';
 DECLARE cmd VARCHAR;
 DECLARE obj RECORD;
 BEGIN
@@ -200,48 +203,50 @@ BEGIN
     LOOP
         IF obj.object_type = 'table' THEN
             sch := REPLACE(obj.schema_name,'"','');
-            sch_hstlog := CONCAT(sch,tblprefix); -- NOVIDADE
+            sch_hstlog := CONCAT(sch,tblsuffix); -- NOVIDADE
             tbl := REPLACE(split_part(obj.object_identity,'.',2),'"','');
-            IF tbl NOT LIKE '%_hstlog' THEN
+
+            IF tbl NOT LIKE '%_' || tblsuffix THEN
 -- =============================================================
 -- VIEW
 -- =============================================================
                 cmd := $cmd$
-                DROP VIEW IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."vw_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$";
+                DROP VIEW IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."vw_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$";
                 $cmd$;
                 EXECUTE cmd;
 -- =============================================================
 -- TRIGGER
 -- =============================================================
                 cmd := $cmd$
-                DROP TRIGGER IF EXISTS "tg_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$" ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || tbl || $cmd$";
+                DROP TRIGGER IF EXISTS "tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || tbl || $cmd$";
                 $cmd$;
                 EXECUTE cmd;
 -- =============================================================
 -- FUNCTION TRIGGER
 -- =============================================================
                 cmd := $cmd$
-                DROP FUNCTION IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblprefix) || $cmd$"();
+                DROP FUNCTION IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"();
                 $cmd$;
                 EXECUTE cmd;
 -- =============================================================
 -- TABLE
 -- =============================================================
                 cmd := $cmd$
-                DROP TABLE IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblprefix) || $cmd$";
+                DROP TABLE IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$";
                 $cmd$;
                 EXECUTE cmd;
             END IF;
         ELSIF obj.object_type = 'schema' THEN
-            IF obj.object_name NOT ILIKE '%_' || tblprefix THEN
+            IF obj.object_name NOT ILIKE '%_' || tblsuffix THEN
                 cmd := $cmd$
-                    DROP SCHEMA IF EXISTS "$cmd$ || CONCAT(obj.object_name,tblprefix) || $cmd$";
+                    DROP SCHEMA IF EXISTS "$cmd$ || CONCAT(obj.object_name,tblsuffix) || $cmd$";
                 $cmd$;
                 EXECUTE cmd;
             END IF;
         END IF;
     END LOOP;
-END; $$;
+END; 
+$BODY$;
 
 -- EVENT TRIGGER PARA O EVENTO DE CREATE TABLE CHAMANDO A EVENT-TRIGGER FUNCTION tg_audit_tables_add()
 CREATE EVENT TRIGGER tg_audit_tables_add
