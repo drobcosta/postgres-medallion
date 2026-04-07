@@ -775,6 +775,27 @@ DECLARE v_record RECORD;
 DECLARE v_bronze_payload_control RECORD;
 DECLARE v_tb_status_id INTEGER DEFAULT 1; -- SE O PARÂMETRO NÃO FOR PASSADO, VAMOS EXECUTAR PARA O PRIMEIRO PERÍODO DE PAYLOAD (A CADA 5 MINUTOS)
 BEGIN
+
+	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+	-- Validação para evitar problemas na concorrência da chamada da função
+	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+	IF NOT pg_try_advisory_lock(666666 + p_tb_status_id) THEN
+	    RAISE NOTICE 'data_catalog.bronze_payload(%) já está em execução. Abortando.',p_tb_status_id;
+		RETURN QUERY
+			SELECT	null::VARCHAR(32) AS tb_databases_id
+					, null::VARCHAR(32) AS tb_schemas_id
+					, null::VARCHAR(32) AS tb_tables_id
+					, null::TIMESTAMP AS insert_timestamp
+					, null::BIGINT AS insert_qty
+					, null::TIMESTAMP AS update_timestamp
+					, null::BIGINT AS update_qty
+					, null::TIMESTAMP AS delete_timestamp
+					, null::BIGINT AS delete_qty
+					, null::TIMESTAMP AS created_at
+					, null::TIMESTAMP AS updated_at;
+	    RETURN;
+	END IF;
+
 	-- SE O PARÂMETRO NÃO FOR PASSADO, VAMOS EXECUTAR PARA O PRIMEIRO PERÍODO DE PAYLOAD (A CADA 5 MINUTOS)
 	v_tb_status_id := COALESCE(p_tb_status_id,v_tb_status_id);
 
