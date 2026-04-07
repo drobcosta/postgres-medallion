@@ -758,7 +758,6 @@ BEGIN
 				END IF;
 
 				-- PARA EVITAR UM LIMIT DE BACKFILL MUITO BAIXO, ESTAMOS LIBERANDO UM LIMIT MÍNIMO DE 150000, QUE É SEGURO FAZER UM DUMP AND LOAD
-				-- E UM LIMIT MÁXIMO DE 1 MILHÃO DE REGISTROS
 				-- SELECT ROUND(n_live_tup * 0.25)::INTEGER 
 				SELECT (CASE WHEN n_live_tup > 150000 THEN (ROUND(n_live_tup * 0.25)::INTEGER) ELSE n_live_tup END)::INTEGER
 				FROM pg_stat_user_tables 
@@ -767,9 +766,11 @@ BEGIN
 				INTO v_payload_limit;
 			ELSE
 				v_payload_limit := v_record.payload_limit;
-				IF v_payload_limit > 1000000 THEN
-					v_payload_limit := 1000000;
-				END IF;
+			END IF;
+
+			-- LIMIT MÁXIMO DE PAYLOAD DE 1 MILHÃO DE REGISTROS
+			IF v_payload_limit > 1000000 THEN
+				v_payload_limit := 1000000;
 			END IF;
 
 			-- Adicionando à variável v_target_timestamp a data limite para o fullcharge
@@ -1263,7 +1264,7 @@ BEGIN
 		            v_record.schema_id,
 		            v_record.table_id,
 		            SQLERRM,
-		            SQLSTATE,
+		            PG_EXCEPTION_DETAIL,
 		            clock_timestamp()
 		        );
 			END;
@@ -1488,7 +1489,7 @@ BEGIN
 			            v_record.schema_id,
 			            v_record.table_id,
 			            SQLERRM,
-			            SQLSTATE,
+			            PG_EXCEPTION_DETAIL,
 			            clock_timestamp()
 			        );
 				END;
