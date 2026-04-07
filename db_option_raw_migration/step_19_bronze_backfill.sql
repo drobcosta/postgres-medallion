@@ -1256,7 +1256,7 @@ BEGIN
 		            tb_tables_id,
 		            error_message,
 		            error_detail,
-		            error_time
+		            created_at
 		        )
 		        VALUES (
 		            v_record.database_id,
@@ -1481,7 +1481,7 @@ BEGIN
 			            tb_tables_id,
 			            error_message,
 			            error_detail,
-			            error_time
+			            created_at
 			        )
 			        VALUES (
 			            v_record.database_id,
