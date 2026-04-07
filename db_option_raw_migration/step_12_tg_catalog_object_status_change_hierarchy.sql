@@ -106,7 +106,7 @@ BEGIN
 					description = COALESCE(description, CONCAT('[automatic description process] database ', name)),
 					updated_at = clock_timestamp()
 					WHERE id = NEW.tb_databases_id
-					AND tb_status_id IN (1,3);
+					AND tb_status_id IN (1,3,8);
 	
 					RETURN NEW;
 				ELSIF NEW.tb_status_id = 3 THEN
@@ -157,7 +157,7 @@ BEGIN
 					description = COALESCE(description, CONCAT('[automatic description process] database ', name)),
 					updated_at = clock_timestamp()
 					WHERE id = NEW.tb_databases_id
-					AND tb_status_id IN (1,3);
+					AND tb_status_id IN (1,3,8);
 	
 					UPDATE data_catalog.tb_schemas SET 
 					tb_status_id = 2,
@@ -165,7 +165,7 @@ BEGIN
 					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND id = NEW.tb_schemas_id
-					AND tb_status_id IN (1,3);
+					AND tb_status_id IN (1,3,8);
 	
 					RETURN NEW;
 				ELSIF NEW.tb_status_id = 3 THEN
@@ -201,7 +201,7 @@ BEGIN
 					description = COALESCE(description, CONCAT('[automatic description process] database ', name)),
 					updated_at = clock_timestamp()
 					WHERE id = NEW.tb_databases_id
-					AND tb_status_id IN (1,3);
+					AND tb_status_id IN (1,3,8);
 	
 					UPDATE data_catalog.tb_schemas SET 
 					tb_status_id = 2,
@@ -209,7 +209,7 @@ BEGIN
 					updated_at = clock_timestamp()
 					WHERE tb_databases_id = NEW.tb_databases_id
 					AND id = NEW.tb_schemas_id
-					AND tb_status_id IN (1,3);
+					AND tb_status_id IN (1,3,8);
 	
 					UPDATE data_catalog.tb_tables SET 
 					tb_status_id = 2,
