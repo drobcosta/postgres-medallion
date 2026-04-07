@@ -1132,6 +1132,7 @@ BEGIN
 			AND vw.table_id = p_tables_id
 		LOOP
 			-- ======================================================================================================================================================
+			BEGIN
 			IF v_record.insert_done IS NULL OR v_record.insert_done IS FALSE THEN
 				RETURN QUERY
 					SELECT	id::INTEGER AS id
@@ -1211,9 +1212,28 @@ BEGIN
 			FROM data_catalog.backfill_done(p_databases_id, p_schemas_id, p_tables_id, null) backfill_done
 			INTO v_backfill_done;
 
-			RETURN;
+		    EXCEPTION WHEN OTHERS THEN
+		        INSERT INTO data_catalog.bronze_backfill_erros (
+		            tb_databases_id,
+		            tb_schemas_id,
+		            tb_tables_id,
+		            error_message,
+		            error_detail,
+		            error_time
+		        )
+		        VALUES (
+		            v_record.database_id,
+		            v_record.schema_id,
+		            v_record.table_id,
+		            SQLERRM,
+		            PG_EXCEPTION_DETAIL,
+		            clock_timestamp()
+		        );
+			END;
 			
 		END LOOP;
+
+		RETURN;
 
 -- ======================================================================================================================================================
 	-- Forçando fullcharge em determinada coluna de uma tabela
@@ -1332,6 +1352,7 @@ BEGIN
 			LOOP
 
 				-- ======================================================================================================================================================
+				BEGIN
 				IF v_record.insert_done IS NULL OR v_record.insert_done IS FALSE THEN
 					RETURN QUERY
 						SELECT	id::INTEGER AS id
@@ -1415,6 +1436,25 @@ BEGIN
 					null
 				) backfill_done
 				INTO v_backfill_done;
+
+			    EXCEPTION WHEN OTHERS THEN
+			        INSERT INTO data_catalog.bronze_backfill_erros (
+			            tb_databases_id,
+			            tb_schemas_id,
+			            tb_tables_id,
+			            error_message,
+			            error_detail,
+			            error_time
+			        )
+			        VALUES (
+			            v_record.database_id,
+			            v_record.schema_id,
+			            v_record.table_id,
+			            SQLERRM,
+			            PG_EXCEPTION_DETAIL,
+			            clock_timestamp()
+			        );
+				END;
 				
 			END LOOP;
 
