@@ -846,7 +846,7 @@ BEGIN
 				v_record.table_id,
 				'bronze_payload_inserts',
 				SQLERRM,
-				PG_EXCEPTION_DETAIL,
+				SQLSTATE,
 				clock_timestamp()
 			);
 		END;
@@ -885,7 +885,7 @@ BEGIN
 				v_record.table_id,
 				'bronze_payload_updates',
 				SQLERRM,
-				PG_EXCEPTION_DETAIL,
+				SQLSTATE,
 				clock_timestamp()
 			);
 		END;
@@ -925,7 +925,7 @@ BEGIN
 				v_record.table_id,
 				'bronze_payload_deletes',
 				SQLERRM,
-				PG_EXCEPTION_DETAIL,
+				SQLSTATE,
 				clock_timestamp()
 			);
 		END;
