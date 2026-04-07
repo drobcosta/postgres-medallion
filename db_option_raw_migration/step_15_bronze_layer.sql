@@ -345,7 +345,6 @@ END IF;
 		--    - tb_columns.data_type não pode ser NULL
 		--    - tb_columns.active precisa ser TRUE
 		-- ==================================================
-		-- RAISE EXCEPTION 'ERRO NA CRIAÇÃO DA PK';
 		FOR v_record IN
 			SELECT	vw.database_id
 					, vw.database_name
@@ -355,7 +354,7 @@ END IF;
 					, vw.table_name
 					, vw.table_description
 					, (CASE WHEN vw2.table_id IS NOT NULL THEN TRUE ELSE FALSE END) AS table_has_pk
-					, string_agg(CONCAT('"',vw.column_name,'" ') || vw.column_data_type,', ') AS table_columns
+					, string_agg(DISTINCT CONCAT('"',vw.column_name,'" ') || vw.column_data_type,', ') AS table_columns
 			FROM data_catalog.vw_catalog vw
 			JOIN LATERAL (
 				SELECT DISTINCT vw2.database_id, vw2.schema_id, vw2.table_id
@@ -400,7 +399,7 @@ END IF;
 			AND c.tb_tables_id = v_record.table_id
 			AND c.is_pk IS TRUE
 			INTO v_columns_pk;
-			
+
 			-- Técnica de dólar quoting, onde usamos o $$ como se fosse uma string
 			-- Por exemplo: 'Data Platform' = $$Data Platform$$ = $qualquercoisa$$Data Platform$qualquercoisa$
 			v_cmd := $cmd$
