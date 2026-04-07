@@ -1,3 +1,47 @@
+CREATE SEQUENCE IF NOT EXISTS data_catalog.bronze_payload_erros_id_seq
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+CREATE TABLE IF NOT EXISTS data_catalog.bronze_payload_erros
+(
+    id bigint NOT NULL DEFAULT nextval('data_catalog.bronze_payload_erros_id_seq'::regclass),
+    tb_databases_id character varying(32) COLLATE pg_catalog."default" NOT NULL,
+    tb_schemas_id character varying(32) COLLATE pg_catalog."default" NOT NULL,
+    tb_tables_id character varying(32) COLLATE pg_catalog."default" NOT NULL,
+	op character varying(32) NOT NULL,
+    error_message text COLLATE pg_catalog."default",
+    error_detail text COLLATE pg_catalog."default",
+    created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT bronze_payload_erros_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE data_catalog.bronze_payload_erros
+    IS 'Tabela responsável por armazenar os erros provenientes do processo de payload entre camada raw e camada bronze';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.id
+    IS 'Coluna PK da tabela.';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.tb_databases_id
+    IS 'Coluna responsável por registrar a qual database este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.tb_schemas_id
+    IS 'Coluna responsável por registrar a qual schema este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.tb_tables_id
+    IS 'Coluna responsável por registrar a qual table este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.error_message
+    IS 'Coluna responsável por armazenar a mensagem de erro do processo de payload.';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.error_detail
+    IS 'Coluna responsável por armazenar o detalhe do erro do processo de payload';
+
+COMMENT ON COLUMN data_catalog.bronze_payload_erros.created_at
+    IS 'Coluna que registra o timestamp exato da inserção do registro na tabela';
+
 CREATE OR REPLACE FUNCTION data_catalog.bronze_payload_deletes(
 	p_databases_id character varying,
 	p_schemas_id character varying,
@@ -748,6 +792,7 @@ BEGIN
 		AND vw.table_payload_period_id = v_tb_status_id
 	LOOP
 		-- PAYLOAD COM INSERTS
+		BEGIN
 		SELECT	tb_databases_id::VARCHAR(32) AS tb_databases_id
 				, tb_schemas_id::VARCHAR(32) AS tb_schemas_id
 				, tb_tables_id::VARCHAR(32) AS tb_tables_id
@@ -764,8 +809,29 @@ BEGIN
 			v_record.schema_id,
 			v_record.table_id
 		) INTO v_bronze_payload_control;
+		EXCEPTION WHEN OTHERS THEN
+			INSERT INTO data_catalog.bronze_payload_erros (
+				tb_databases_id,
+				tb_schemas_id,
+				tb_tables_id,
+				op,
+				error_message,
+				error_detail,
+				created_at
+			)
+			VALUES (
+				v_record.database_id,
+				v_record.schema_id,
+				v_record.table_id,
+				'bronze_payload_inserts',
+				SQLERRM,
+				PG_EXCEPTION_DETAIL,
+				clock_timestamp()
+			);
+		END;
 
 		-- PAYLOAD COM UPDATES
+		BEGIN
 		SELECT	tb_databases_id::VARCHAR(32) AS tb_databases_id
 				, tb_schemas_id::VARCHAR(32) AS tb_schemas_id
 				, tb_tables_id::VARCHAR(32) AS tb_tables_id
@@ -782,8 +848,29 @@ BEGIN
 			v_record.schema_id,
 			v_record.table_id
 		) INTO v_bronze_payload_control;
+		EXCEPTION WHEN OTHERS THEN
+			INSERT INTO data_catalog.bronze_payload_erros (
+				tb_databases_id,
+				tb_schemas_id,
+				tb_tables_id,
+				op,
+				error_message,
+				error_detail,
+				created_at
+			)
+			VALUES (
+				v_record.database_id,
+				v_record.schema_id,
+				v_record.table_id,
+				'bronze_payload_updates',
+				SQLERRM,
+				PG_EXCEPTION_DETAIL,
+				clock_timestamp()
+			);
+		END;
 
 		-- PAYLOAD COM DELETES
+		BEGIN
 		RETURN QUERY
 			SELECT	tb_databases_id::VARCHAR(32) AS tb_databases_id
 					, tb_schemas_id::VARCHAR(32) AS tb_schemas_id
@@ -801,6 +888,27 @@ BEGIN
 				v_record.schema_id,
 				v_record.table_id
 			);
+		EXCEPTION WHEN OTHERS THEN
+			INSERT INTO data_catalog.bronze_payload_erros (
+				tb_databases_id,
+				tb_schemas_id,
+				tb_tables_id,
+				op,
+				error_message,
+				error_detail,
+				created_at
+			)
+			VALUES (
+				v_record.database_id,
+				v_record.schema_id,
+				v_record.table_id,
+				'bronze_payload_deletes',
+				SQLERRM,
+				PG_EXCEPTION_DETAIL,
+				clock_timestamp()
+			);
+		END;
+			
 	END LOOP;
 
 	RETURN;
