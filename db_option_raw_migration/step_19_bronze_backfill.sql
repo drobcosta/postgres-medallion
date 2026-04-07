@@ -1081,11 +1081,10 @@ DECLARE v_record_objects RECORD;
 DECLARE v_cmd VARCHAR;
 DECLARE v_backfill_done BOOLEAN;
 BEGIN
-
 	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
 	-- Validação para evitar problemas na concorrência da chamada da função
 	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
-	IF NOT pg_try_advisory_lock(777775 + SIGN(COALESCE(p_databases_id, 0)) + SIGN(COALESCE(p_schemas_id, 0)) + SIGN(COALESCE(p_tables_id, 0)) + SIGN(COALESCE(p_columns_id, 0))) THEN
+	IF NOT pg_try_advisory_lock(777775 + COALESCE(p_databases_id IS NOT NULL,false)::integer + COALESCE(p_schemas_id IS NOT NULL,false)::integer + COALESCE(p_tables_id IS NOT NULL,false)::integer + COALESCE(p_columns_id IS NOT NULL,false)::integer) THEN
 	    RAISE NOTICE 'data_catalog.bronze_backfill(%,%,%,%) já está em execução. Abortando.',p_databases_id,p_schemas_id,p_tables_id,p_columns_id;
 		RETURN QUERY
 			SELECT	null::INTEGER AS id
