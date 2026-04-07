@@ -1,3 +1,10 @@
+CREATE SEQUENCE IF NOT EXISTS data_catalog.bronze_backfill_erros_id_seq
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
 CREATE TABLE IF NOT EXISTS data_catalog.bronze_backfill_erros
 (
     id bigint NOT NULL DEFAULT nextval('data_catalog.bronze_backfill_erros_id_seq'::regclass),
