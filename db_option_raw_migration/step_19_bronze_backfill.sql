@@ -1081,6 +1081,31 @@ DECLARE v_record_objects RECORD;
 DECLARE v_cmd VARCHAR;
 DECLARE v_backfill_done BOOLEAN;
 BEGIN
+
+	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+	-- Validação para evitar problemas na concorrência da chamada da função
+	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+	IF NOT pg_try_advisory_lock(777775 + SIGN(COALESCE(p_databases_id, 0)) + SIGN(COALESCE(p_schemas_id, 0)) + SIGN(COALESCE(p_tables_id, 0)) + SIGN(COALESCE(p_columns_id, 0))) THEN
+	    RAISE NOTICE 'data_catalog.bronze_backfill(%,%,%,%) já está em execução. Abortando.',p_databases_id,p_schemas_id,p_tables_id,p_columns_id;
+		RETURN QUERY
+			SELECT	null::INTEGER AS id
+					, null::VARCHAR(32) AS tb_databases_id
+					, null::VARCHAR(32) AS tb_schemas_id
+					, null::VARCHAR(32) AS tb_tables_id
+					, null::VARCHAR(32) AS tb_columns_id
+					, null::INTEGER AS payload_limit
+					, null::TIMESTAMP WITHOUT TIME ZONE AS target_timestamp
+					, null::TIMESTAMP WITHOUT TIME ZONE AS insert_timestamp
+					, null::BOOLEAN AS insert_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS update_timestamp
+					, null::BOOLEAN AS update_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS delete_timestamp
+					, null::BOOLEAN AS delete_done
+					, null::TIMESTAMP WITHOUT TIME ZONE AS created_at
+					, null::TIMESTAMP WITHOUT TIME ZONE AS updated_at;
+	    RETURN;
+	END IF;
+
 	-- Forçando fullcharge em determinada tabela
 	-- [OBRIGATÓRIO] p_databases_id IS NOT NULL
 	-- [OBRIGATÓRIO] p_schemas_id IS NOT NULL
