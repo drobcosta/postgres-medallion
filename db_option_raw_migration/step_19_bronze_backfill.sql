@@ -1,3 +1,26 @@
+CREATE TABLE IF NOT EXISTS data_catalog.bronze_backfill_erros
+(
+    id bigint NOT NULL DEFAULT nextval('data_catalog.bronze_backfill_erros_id_seq'::regclass),
+    tb_databases_id character varying(32) COLLATE pg_catalog."default" NOT NULL,
+    tb_schemas_id character varying(32) COLLATE pg_catalog."default" NOT NULL,
+    tb_tables_id character varying(32) COLLATE pg_catalog."default" NOT NULL,
+    tb_columns_id character varying(32) COLLATE pg_catalog."default",
+    error_message text COLLATE pg_catalog."default",
+    error_detail text COLLATE pg_catalog."default",
+    created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT bronze_backfill_erros_pkey PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE data_catalog.bronze_backfill_erros IS 'Tabela responsável por armazenar os erros provenientes do processo de backfill entre camada raw e camada bronze';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.id IS 'Coluna PK da tabela.';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.tb_databases_id IS 'Coluna responsável por registrar a qual database este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.tb_schemas_id IS 'Coluna responsável por registrar a qual schema este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.tb_tables_id IS 'Coluna responsável por registrar a qual table este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.tb_columns_id IS 'Coluna responsável por registrar a qual column este error pertence. Não tem uma FK por se tratar de uma tabela de log.';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.error_message IS 'Coluna responsável por armazenar a mensagem de erro do processo de backfill.';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.error_detail IS 'Coluna responsável por armazenar o detalhe do erro do processo de backfill';
+COMMENT ON COLUMN data_catalog.bronze_backfill_erros.created_at IS 'Coluna que registra o timestamp exato da inserção do registro na tabela';
+
 CREATE OR REPLACE FUNCTION data_catalog.bronze_backfill_deletes(
 	p_databases_id character varying DEFAULT NULL::character varying,
 	p_schemas_id character varying DEFAULT NULL::character varying,
