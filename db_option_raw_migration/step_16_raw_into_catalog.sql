@@ -24,6 +24,17 @@ CREATE OR REPLACE FUNCTION data_catalog.raw_into_catalog(
 
 AS $BODY$
 BEGIN
+	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+	-- Validação para evitar problemas na concorrência da chamada da função
+	-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+	IF NOT pg_try_advisory_lock(888888) THEN
+	    RAISE NOTICE 'data_catalog.raw_into_catalog() já está em execução. Abortando.';
+		RETURN QUERY
+			SELECT	null AS object_type
+					, null AS object_qty;
+	    RETURN;
+	END IF;
+	
 	RETURN QUERY
 		WITH raw_data AS (
 			SELECT	MD5(REGEXP_REPLACE(c.table_schema,tb_raw_databases_schemas_excluded_patterns.pattern, '', 'g')) AS database_id
