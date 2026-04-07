@@ -44,6 +44,19 @@ BEGIN
 */
 
 -- --------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Validação para evitar problemas na concorrência da chamada da função
+-- --------------------------------------------------------------------------------------------------------------------------------------------------------
+IF NOT pg_try_advisory_lock(999999 + p_status_object) THEN
+    RAISE NOTICE 'data_catalog.bronze_layer(%) já está em execução. Abortando.', p_status_object;
+	RETURN QUERY
+		SELECT	null AS object_type
+				, null AS object_name
+				, null AS object_status_from
+				, null AS object_status_to;
+    RETURN;
+END IF;
+
+-- --------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Determina o status de origem e destino com base no status atual do objeto. -- Cada bloco representa uma transição válida no fluxo de governança.
 -- Bloco da função para argumento p_status_object = 2
 -- --------------------------------------------------------------------------------------------------------------------------------------------------------
