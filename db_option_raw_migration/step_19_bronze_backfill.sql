@@ -1264,7 +1264,7 @@ BEGIN
 		            v_record.schema_id,
 		            v_record.table_id,
 		            SQLERRM,
-		            PG_EXCEPTION_DETAIL,
+		            SQLSTATE,
 		            clock_timestamp()
 		        );
 			END;
@@ -1489,7 +1489,7 @@ BEGIN
 			            v_record.schema_id,
 			            v_record.table_id,
 			            SQLERRM,
-			            PG_EXCEPTION_DETAIL,
+			            SQLSTATE,
 			            clock_timestamp()
 			        );
 				END;
