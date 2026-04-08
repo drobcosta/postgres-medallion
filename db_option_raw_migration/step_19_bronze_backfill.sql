@@ -192,8 +192,6 @@ BEGIN
 					v_delete_timestamp := v_record.delete_timestamp;
 				END IF;
 
-				-- RAISE EXCEPTION '%', v_delete_timestamp;
-
 				-- Criando de forma dinâmica uma comparação para ser usada na cláusula WHERE entre as PKs
 				SELECT	CONCAT('(',string_agg(CONCAT('bronze."',column_name,'"'),', '),')') AS bronze_columns_pk
 						, CONCAT('(',string_agg(CONCAT('ds."',column_name,'"'),', '),')') AS hstlog_columns_pk
@@ -237,8 +235,6 @@ BEGIN
 					FROM bronze_registry, backfill_registry
 					GROUP BY 1
 				$cmd$;
-
-				-- RAISE EXCEPTION '%', v_cmd;
 
 				IF v_cmd IS NOT NULL THEN
 					EXECUTE v_cmd INTO v_delete_timestamp, v_qty;
@@ -689,10 +685,13 @@ DECLARE v_hstlog_new_columns VARCHAR;
 DECLARE v_hstlog_old_columns VARCHAR;
 DECLARE v_bronze_columns_pk_name VARCHAR;
 DECLARE v_bronze_columns_pk VARCHAR;
+DECLARE v_source_columns_pk VARCHAR;
+DECLARE v_target_columns_pk VARCHAR;
 DECLARE v_target_timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT clock_timestamp();
 DECLARE v_qty INTEGER DEFAULT 0;
 -- VARIÁVEIS DE OPERAÇÕES DE INSERT
 DECLARE v_insert_timestamp TIMESTAMP WITHOUT TIME ZONE;
+DECLARE v_table_to_merge VARCHAR;
 BEGIN
 	-- Forçando fullcharge em determinada tabela
 	-- [OBRIGATÓRIO] p_databases_id IS NOT NULL
@@ -793,7 +792,10 @@ BEGIN
 			INTO v_bronze_columns, v_hstlog_new_columns, v_hstlog_old_columns;
 
 			-- Coletando os nomes das colunas que são PK para UPSERT
-			SELECT pk_name, CONCAT('(',string_agg(CONCAT('"',column_name,'"'),', '),')') AS bronze_columns_pk
+			SELECT	pk_name
+					, CONCAT('(',string_agg(CONCAT('"',column_name,'"'),', '),')') AS bronze_columns_pk
+					, CONCAT('(',string_agg(CONCAT('src."',column_name,'"'),', '),')') AS source_columns_pk
+					, CONCAT('(',string_agg(CONCAT('tgt."',column_name,'"'),', '),')') AS target_columns_pk
 			FROM (
 				SELECT tc.constraint_name AS pk_name, c.column_name, c.data_type
 				FROM information_schema.table_constraints tc
@@ -810,7 +812,7 @@ BEGIN
 				AND tc.constraint_type = 'PRIMARY KEY'
 			) columns_pk
 			GROUP BY pk_name
-			INTO v_bronze_columns_pk_name, v_bronze_columns_pk;
+			INTO v_bronze_columns_pk_name, v_bronze_columns_pk, v_source_columns_pk, v_target_columns_pk;
 			
 			-- ======================================================================================================================================================
 			-- ======================================================================================================================================================
@@ -862,6 +864,38 @@ BEGIN
 				END IF;
 
 				-- Carga do chunk fullcharge da tabela
+				v_table_to_merge := CONCAT('tmp_target_table_',to_char(clock_timestamp(),'YYYYMMDDHH24MISSMS'));
+				v_cmd := $cmd$
+					CREATE TEMPORARY TABLE "$cmd$ || v_table_to_merge || $cmd$" AS
+					SELECT	$cmd$ || v_hstlog_new_columns || $cmd$
+							, executed_at
+					FROM $cmd$ || v_record.hstlog_insert_path || $cmd$
+					WHERE executed_at >= '$cmd$ || v_insert_timestamp || $cmd$'
+					AND executed_at < '$cmd$ || v_target_timestamp || $cmd$'
+					ORDER BY executed_at ASC
+					LIMIT $cmd$ || v_payload_limit || $cmd$;
+	
+					WITH bronze_registry AS (
+						MERGE INTO $cmd$ || v_record.bronze_path || $cmd$ AS tgt
+						USING "$cmd$ || v_table_to_merge || $cmd$" AS src
+						ON $cmd$ || v_target_columns_pk || $cmd$ = $cmd$ || v_source_columns_pk || $cmd$
+						WHEN NOT MATCHED THEN
+						    INSERT ($cmd$ || v_bronze_columns || $cmd$)
+						    VALUES ($cmd$ || CONCAT('src.',array_to_string(string_to_array(v_bronze_columns,', '),', src.')) || $cmd$)
+						RETURNING 1
+					)
+					, backfill_registry AS (
+						SELECT MAX(executed_at) AS insert_timestamp
+						FROM "$cmd$ || v_table_to_merge || $cmd$"
+					)
+					SELECT backfill_registry.insert_timestamp, COUNT(bronze_registry.*) 
+					FROM bronze_registry, backfill_registry
+					GROUP BY 1
+				$cmd$;
+
+				-- VERSÃO ABAIXO DE CARGA DE INSERTS USANDO ON CONFLICT
+				/*
+				-- Carga do chunk fullcharge da tabela
 				v_cmd := $cmd$
 					WITH datasource AS (
 						SELECT	$cmd$ || v_hstlog_new_columns || $cmd$
@@ -885,6 +919,7 @@ BEGIN
 					FROM bronze_registry, backfill_registry
 					GROUP BY 1
 				$cmd$;
+				*/
 
 				IF v_cmd IS NOT NULL THEN
 					EXECUTE v_cmd INTO v_insert_timestamp, v_qty;
