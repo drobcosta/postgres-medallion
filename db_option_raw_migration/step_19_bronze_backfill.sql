@@ -99,8 +99,11 @@ BEGIN
 				AND bbc.tb_tables_id = vw.table_id
 				AND bbc.tb_columns_id IS NULL
 			WHERE vw.database_status_id = 5
+			AND vw.database_active IS TRUE
 			AND vw.schema_status_id = 5
+			AND vw.schema_active IS TRUE
 			AND vw.table_status_id = 5
+			AND vw.table_active IS TRUE
 			AND blc.tb_tables_id IS NULL
 			AND (
 				bbc.id IS NULL
@@ -407,8 +410,11 @@ BEGIN
 				AND bbc.tb_tables_id = vw.table_id
 				AND bbc.tb_columns_id IS NULL
 			WHERE vw.database_status_id = 5
+			AND vw.database_active IS TRUE
 			AND vw.schema_status_id = 5
+			AND vw.schema_active IS TRUE
 			AND vw.table_status_id = 5
+			AND vw.table_active IS TRUE
 			AND blc.tb_tables_id IS NULL
 			AND (
 				bbc.id IS NULL
@@ -736,8 +742,11 @@ BEGIN
 				AND bbc.tb_tables_id = vw.table_id
 				AND bbc.tb_columns_id IS NULL
 			WHERE vw.database_status_id = 5
+			AND vw.database_active IS TRUE
 			AND vw.schema_status_id = 5
+			AND vw.schema_active IS TRUE
 			AND vw.table_status_id = 5
+			AND vw.table_active IS TRUE
 			AND blc.tb_tables_id IS NULL
 			AND (
 				bbc.id IS NULL
@@ -1190,8 +1199,11 @@ BEGIN
 				AND bbc.tb_tables_id = vw.table_id
 				AND bbc.tb_columns_id IS NULL
 			WHERE vw.database_status_id = 5
+			AND vw.database_active IS TRUE
 			AND vw.schema_status_id = 5
+			AND vw.schema_active IS TRUE
 			AND vw.table_status_id = 5
+			AND vw.table_active IS TRUE
 			AND blc.tb_tables_id IS NULL
 			AND (
 				bbc.id IS NULL OR (
@@ -1360,8 +1372,11 @@ BEGIN
 				AND bbc.tb_tables_id = vw.table_id
 				AND bbc.tb_columns_id IS NULL
 			WHERE vw.database_status_id = 5
+			AND vw.database_active IS TRUE
 			AND vw.schema_status_id = 5
+			AND vw.schema_active IS TRUE
 			AND vw.table_status_id = 5
+			AND vw.table_active IS TRUE
 			AND blc.tb_tables_id IS NULL
 			AND (
 				bbc.id IS NULL OR (
