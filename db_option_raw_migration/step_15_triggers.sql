@@ -93,3 +93,43 @@ EXECUTE PROCEDURE data_catalog.tg_catalog_object_status_change_hierarchy('column
 COMMENT ON TRIGGER tg_catalog_object_status_change_hierarchy
 ON data_catalog.tb_columns
 IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para todos os databases, schemas e tabelas que dependem de tb_columns. Esta trigger só será executada caso o novo tb_status_id seja 2, 3 ou 6';
+
+-- Trigger responsável por tornar dinâmica a mudança da coluna active
+-- para todos os schemas, tabelas e colunas que dependem de tb_databases.
+CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_databases
+FOR EACH ROW WHEN (NEW.active = FALSE)
+EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('databases');
+
+COMMENT ON TRIGGER tg_inactivating_catalog_objects
+ON data_catalog.tb_databases
+IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para todos os schemas, tabelas e colunas que dependem de tb_databases';
+
+-- Trigger responsável por tornar dinâmica a mudança da coluna active
+-- para todas as tabelas e colunas que dependem de tb_schemas.
+CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_schemas
+FOR EACH ROW WHEN (NEW.active = FALSE)
+EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('schemas');
+
+COMMENT ON TRIGGER tg_inactivating_catalog_objects
+ON data_catalog.tb_schemas
+IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para todas as tabelas e colunas que dependem de tb_schemas';
+
+-- Trigger responsável por tornar dinâmica a mudança da coluna active
+-- para todas as colunas que dependem de tb_tables.
+CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_tables
+FOR EACH ROW WHEN (NEW.active = FALSE)
+EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('tables');
+
+COMMENT ON TRIGGER tg_inactivating_catalog_objects
+ON data_catalog.tb_tables
+IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para todas as colunas que dependem de tb_tables';
+
+-- Trigger responsável por tornar dinâmica a mudança da coluna active
+-- para todas as colunas.
+CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_columns
+FOR EACH ROW WHEN (NEW.active = FALSE)
+EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('columns');
+
+COMMENT ON TRIGGER tg_inactivating_catalog_objects
+ON data_catalog.tb_columns
+IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para todas as colunas';
