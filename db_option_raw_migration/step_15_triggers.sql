@@ -96,7 +96,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança de tb_status_id para to
 
 -- Trigger responsável por tornar dinâmica a mudança da coluna active
 -- para todos os schemas, tabelas e colunas que dependem de tb_databases.
-CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_databases
+CREATE TRIGGER tg_inactivating_catalog_objects AFTER UPDATE ON data_catalog.tb_databases
 FOR EACH ROW WHEN (NEW.active = FALSE)
 EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('databases');
 
@@ -106,7 +106,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para t
 
 -- Trigger responsável por tornar dinâmica a mudança da coluna active
 -- para todas as tabelas e colunas que dependem de tb_schemas.
-CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_schemas
+CREATE TRIGGER tg_inactivating_catalog_objects AFTER UPDATE ON data_catalog.tb_schemas
 FOR EACH ROW WHEN (NEW.active = FALSE)
 EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('schemas');
 
@@ -116,7 +116,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para t
 
 -- Trigger responsável por tornar dinâmica a mudança da coluna active
 -- para todas as colunas que dependem de tb_tables.
-CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_tables
+CREATE TRIGGER tg_inactivating_catalog_objects AFTER UPDATE ON data_catalog.tb_tables
 FOR EACH ROW WHEN (NEW.active = FALSE)
 EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('tables');
 
@@ -126,7 +126,7 @@ IS 'Trigger responsável por tornar dinâmica a mudança da coluna active para t
 
 -- Trigger responsável por tornar dinâmica a mudança da coluna active
 -- para todas as colunas.
-CREATE TRIGGER tg_inactivating_catalog_objects BEFORE UPDATE ON data_catalog.tb_columns
+CREATE TRIGGER tg_inactivating_catalog_objects AFTER UPDATE ON data_catalog.tb_columns
 FOR EACH ROW WHEN (NEW.active = FALSE)
 EXECUTE PROCEDURE data_catalog.tg_inactivating_catalog_objects('columns');
 
