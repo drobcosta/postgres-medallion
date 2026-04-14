@@ -530,9 +530,9 @@ BEGIN
 					SELECT tc.constraint_name AS pk_name, c.column_name, c.data_type
 					FROM information_schema.columns c
 					JOIN data_catalog.vw_bronze_active_objects vw
-						ON vw.bronze_schema = columns.table_schema
-						AND vw.table_name = columns.table_name
-						AND vw.column_name = columns.column_name
+						ON vw.bronze_schema = c.table_schema
+						AND vw.table_name = c.table_name
+						AND vw.column_name = c.column_name
 					LEFT JOIN information_schema.table_constraints tc
 						ON tc.table_schema = c.table_schema
 						AND tc.table_name = c.table_name
