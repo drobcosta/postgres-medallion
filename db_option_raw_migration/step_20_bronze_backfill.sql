@@ -142,11 +142,20 @@ BEGIN
 					, string_agg(CONCAT('("',v_record.table_name,'_new"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_new_columns
 					, string_agg(CONCAT('("',v_record.table_name,'_old"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_old_columns
 			FROM (
-				SELECT column_name, data_type
+				-- SELECT column_name, data_type
+				-- FROM information_schema.columns
+				-- WHERE table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				-- AND table_name = v_record.table_name
+				-- ORDER BY ordinal_position
+				SELECT columns.column_name, columns.data_type
 				FROM information_schema.columns
-				WHERE table_schema = REPLACE(v_record.bronze_schema_name,'"','')
-				AND table_name = v_record.table_name
-				ORDER BY ordinal_position
+				JOIN data_catalog.vw_bronze_active_objects vw
+					ON vw.bronze_schema = columns.table_schema
+					AND vw.table_name = columns.table_name
+					AND vw.column_name = columns.column_name
+				WHERE columns.table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				AND columns.table_name = v_record.table_name
+				ORDER BY columns.ordinal_position
 			) columns
 			INTO v_bronze_columns, v_hstlog_new_columns, v_hstlog_old_columns;
 
@@ -453,11 +462,20 @@ BEGIN
 					, string_agg(CONCAT('("',v_record.table_name,'_new"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_new_columns
 					, string_agg(CONCAT('("',v_record.table_name,'_old"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_old_columns
 			FROM (
-				SELECT column_name, data_type
+				-- SELECT column_name, data_type
+				-- FROM information_schema.columns
+				-- WHERE table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				-- AND table_name = v_record.table_name
+				-- ORDER BY ordinal_position
+				SELECT columns.column_name, columns.data_type
 				FROM information_schema.columns
-				WHERE table_schema = REPLACE(v_record.bronze_schema_name,'"','')
-				AND table_name = v_record.table_name
-				ORDER BY ordinal_position
+				JOIN data_catalog.vw_bronze_active_objects vw
+					ON vw.bronze_schema = columns.table_schema
+					AND vw.table_name = columns.table_name
+					AND vw.column_name = columns.column_name
+				WHERE columns.table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				AND columns.table_name = v_record.table_name
+				ORDER BY columns.ordinal_position
 			) columns
 			INTO v_bronze_columns, v_hstlog_new_columns, v_hstlog_old_columns;
 
@@ -511,6 +529,10 @@ BEGIN
 				FROM (
 					SELECT tc.constraint_name AS pk_name, c.column_name, c.data_type
 					FROM information_schema.columns c
+					JOIN data_catalog.vw_bronze_active_objects vw
+						ON vw.bronze_schema = columns.table_schema
+						AND vw.table_name = columns.table_name
+						AND vw.column_name = columns.column_name
 					LEFT JOIN information_schema.table_constraints tc
 						ON tc.table_schema = c.table_schema
 						AND tc.table_name = c.table_name
@@ -524,6 +546,24 @@ BEGIN
 					AND tc.constraint_type = 'PRIMARY KEY'
 					AND kcu.column_name IS NULL
 				) columns_not_pk
+				-- SELECT	CONCAT(string_agg(CONCAT('"',column_name,'"'),', ')) AS bronze_columns_not_pk
+				-- 		, CONCAT(string_agg(CONCAT('"',column_name,'" = ds."',column_name,'"'),', ')) AS bronze_raw_columns
+				-- FROM (
+				-- 	SELECT tc.constraint_name AS pk_name, c.column_name, c.data_type
+				-- 	FROM information_schema.columns c
+				-- 	LEFT JOIN information_schema.table_constraints tc
+				-- 		ON tc.table_schema = c.table_schema
+				-- 		AND tc.table_name = c.table_name
+				-- 	LEFT JOIN information_schema.key_column_usage kcu
+				-- 		ON kcu.table_schema = tc.table_schema
+				-- 		AND kcu.table_name = tc.table_name
+				-- 		AND kcu.constraint_name = tc.constraint_name
+				-- 		AND kcu.column_name = c.column_name
+				-- 	WHERE tc.table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				-- 	AND tc.table_name = v_record.table_name
+				-- 	AND tc.constraint_type = 'PRIMARY KEY'
+				-- 	AND kcu.column_name IS NULL
+				-- ) columns_not_pk
 				INTO v_bronze_columns_not_pk, v_bronze_raw_columns;
 	
 				-- Criando de forma dinâmica uma comparação para ser usada na cláusula WHERE entre as PKs
@@ -792,11 +832,20 @@ BEGIN
 					, string_agg(CONCAT('("',v_record.table_name,'_new"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_new_columns
 					, string_agg(CONCAT('("',v_record.table_name,'_old"->>','''', column_name, ''')::', data_type, ' AS "', column_name, '"'),', ') AS hstlog_old_columns
 			FROM (
-				SELECT column_name, data_type
+				SELECT columns.column_name, columns.data_type
 				FROM information_schema.columns
-				WHERE table_schema = REPLACE(v_record.bronze_schema_name,'"','')
-				AND table_name = v_record.table_name
-				ORDER BY ordinal_position
+				JOIN data_catalog.vw_bronze_active_objects vw
+					ON vw.bronze_schema = columns.table_schema
+					AND vw.table_name = columns.table_name
+					AND vw.column_name = columns.column_name
+				WHERE columns.table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				AND columns.table_name = v_record.table_name
+				ORDER BY columns.ordinal_position
+				-- SELECT column_name, data_type
+				-- FROM information_schema.columns
+				-- WHERE table_schema = REPLACE(v_record.bronze_schema_name,'"','')
+				-- AND table_name = v_record.table_name
+				-- ORDER BY ordinal_position
 			) columns
 			INTO v_bronze_columns, v_hstlog_new_columns, v_hstlog_old_columns;
 
