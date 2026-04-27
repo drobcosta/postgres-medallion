@@ -1002,6 +1002,12 @@ END IF;
 							WHERE id = v_record2.schema_id
 							AND tb_databases_id = v_record.database_id
 							AND tb_status_id IN (5,6,7);
+
+							DELETE FROM data_catalog.bronze_payload_control
+							WHERE tb_databases_id = v_record.database_id;
+
+							DELETE FROM data_catalog.bronze_backfill_control
+							WHERE tb_databases_id = v_record.database_id;
 							
 							RETURN QUERY
 								SELECT	DISTINCT
@@ -1098,6 +1104,14 @@ END IF;
 					WHERE id = v_record.schema_id
 					AND tb_databases_id = v_record.database_id
 					AND tb_status_id = 7;
+
+					DELETE FROM data_catalog.bronze_payload_control
+					WHERE tb_databases_id = v_record.database_id
+					AND tb_schemas_id = v_record.schema_id;
+
+					DELETE FROM data_catalog.bronze_backfill_control
+					WHERE tb_databases_id = v_record.database_id
+					AND tb_schemas_id = v_record.schema_id;
 					
 					RETURN QUERY
 						SELECT	DISTINCT
@@ -1163,6 +1177,16 @@ END IF;
 				AND tb_schemas_id = v_record.schema_id
 				AND tb_tables_id = v_record.table_id
 				AND tb_status_id IN (5,6,7);
+
+				DELETE FROM data_catalog.bronze_payload_control
+				WHERE tb_databases_id = v_record.database_id
+				AND tb_schemas_id = v_record.schema_id
+				AND tb_tables_id = v_record.table_id;
+
+				DELETE FROM data_catalog.bronze_backfill_control
+				WHERE tb_databases_id = v_record.database_id
+				AND tb_schemas_id = v_record.schema_id
+				AND tb_tables_id = v_record.table_id;
 				
 				RETURN QUERY
 					SELECT	DISTINCT
@@ -1223,6 +1247,18 @@ END IF;
 				AND tb_tables_id = v_record.table_id
 				AND id = v_record.column_id
 				AND tb_status_id = 7;
+
+				DELETE FROM data_catalog.bronze_payload_control
+				WHERE tb_databases_id = v_record.database_id
+				AND tb_schemas_id = v_record.schema_id
+				AND tb_tables_id = v_record.table_id
+				AND tb_columns_id = v_record.column_id;
+
+				DELETE FROM data_catalog.bronze_backfill_control
+				WHERE tb_databases_id = v_record.database_id
+				AND tb_schemas_id = v_record.schema_id
+				AND tb_tables_id = v_record.table_id
+				AND tb_columns_id = v_record.column_id;
 				
 				RETURN QUERY
 					SELECT	DISTINCT
