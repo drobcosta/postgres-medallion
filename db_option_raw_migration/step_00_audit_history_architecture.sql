@@ -265,3 +265,263 @@ CREATE EVENT TRIGGER tg_audit_schemas_drop
 ON sql_drop
 WHEN tag IN ('DROP SCHEMA')
 EXECUTE PROCEDURE tg_audit_tables_drop();
+
+-- FUNÇÃO OPCIONAL PARA CRIAR A ESTRUTURA AUDITLOG MANUAL CASA NÃO DESEJE UTILIZAR EVENT TRIGGER
+CREATE OR REPLACE FUNCTION public.fn_audit_tables_add(
+	p_table character varying)
+    RETURNS TABLE(object_name character varying, object_type character varying) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE sch_hstlog VARCHAR;
+DECLARE sch VARCHAR;
+DECLARE tbl VARCHAR;
+DECLARE tblsuffix VARCHAR DEFAULT '_auditlog';
+DECLARE parent VARCHAR;
+DECLARE cmd VARCHAR;
+DECLARE obj RECORD;
+BEGIN
+    SET client_min_messages = 'error';
+-- ===================================================================================
+	IF EXISTS(SELECT relname FROM pg_class WHERE relname = p_table AND relkind = 'r') THEN
+		SELECT s.nspname FROM pg_namespace s JOIN pg_class t ON t.relnamespace = s.oid AND t.relname = p_table AND t.relkind = 'r' INTO sch;
+		sch_hstlog := CONCAT(sch,tblsuffix);
+		tbl := p_table;
+		SELECT tp.inhparent::VARCHAR FROM pg_inherits tp JOIN pg_class t ON t.oid = tp.inhrelid WHERE t.relname = p_table INTO parent;
+		
+		IF tbl NOT LIKE '%_' || tblsuffix AND parent IS NULL THEN
+		-- =============================================================
+		-- SCHEMA
+		-- =============================================================
+			cmd := $cmd$
+			CREATE SCHEMA IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$";
+			$cmd$;
+			
+			EXECUTE cmd;
+			RETURN QUERY
+			SELECT sch_hstlog::VARCHAR AS object_name, 'SCHEMA'::VARCHAR AS object_type;
+		-- =============================================================
+		-- TABLE
+		-- =============================================================
+		cmd := $cmd$
+			CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" (
+				id bigserial,
+				"$cmd$ || tbl || $cmd$_old" jsonb,
+				"$cmd$ || tbl || $cmd$_new" jsonb,
+				tg_usr varchar,
+				tg_op varchar,
+				executed_at timestamp without time zone not null default current_timestamp
+			) PARTITION BY LIST(tg_op);
+			CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_insert"
+				PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" FOR VALUES IN ('INSERT');
+			CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_update" 
+				PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" FOR VALUES IN ('UPDATE');
+			CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_delete"
+				PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" FOR VALUES IN ('DELETE');
+			CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_truncate"
+				PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" FOR VALUES IN ('TRUNCATE');
+			CREATE TABLE IF NOT EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_default"
+				PARTITION OF "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" DEFAULT;
+			CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_tg_op"
+				ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" (tg_op, executed_at);
+			CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_insert_brin"
+				ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_insert" USING BRIN (executed_at) WITH (pages_per_range = 128);
+			CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_update_brin"
+				ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_update" USING BRIN (executed_at) WITH (pages_per_range = 128);
+			CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_delete_brin"
+				ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_delete" USING BRIN (executed_at) WITH (pages_per_range = 128);
+			CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_truncate_brin"
+				ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_truncate" USING BRIN (executed_at) WITH (pages_per_range = 128);
+			CREATE INDEX IF NOT EXISTS "idx_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_default_brin"
+				ON "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$_default" USING BRIN (executed_at) WITH (pages_per_range = 128);
+		$cmd$;
+		EXECUTE cmd;
+		RETURN QUERY
+			SELECT CONCAT(tbl,tblsuffix)::VARCHAR AS object_name, 'TABLE'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_insert')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_update')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_delete')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_truncate')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_default')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_tg_op')::VARCHAR AS object_name, 'TRIGGER'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_insert_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_update_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_delete_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_truncate_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+			SELECT CONCAT(tbl,tblsuffix,'_default_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type;
+		-- =============================================================
+		-- FUNCTION TRIGGER
+		-- =============================================================
+		cmd := $cmd$
+			CREATE OR REPLACE FUNCTION "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"()
+			RETURNS TRIGGER
+			SECURITY INVOKER
+			LANGUAGE PLPGSQL
+			AS $tg$
+			BEGIN
+				IF TG_OP = 'INSERT' THEN
+					INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
+					VALUES (NULL, row_to_json(NEW.*), current_user, TG_OP, clock_timestamp());
+				ELSE
+					INSERT INTO "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" ("$cmd$ || tbl || $cmd$_old", "$cmd$ || tbl || $cmd$_new", tg_usr, tg_op, executed_at)
+					VALUES (row_to_json(OLD.*), row_to_json(NEW.*), current_user, TG_OP, clock_timestamp());
+				END IF;
+				
+				RETURN NEW;
+			END; $tg$;
+		$cmd$;
+		EXECUTE cmd;
+		RETURN QUERY
+			SELECT CONCAT('tg_',tbl,tblsuffix)::VARCHAR AS object_name, 'FUNCTION'::VARCHAR AS object_type;
+		-- =============================================================
+		-- TRIGGER
+		-- =============================================================
+		IF NOT EXISTS (
+			SELECT tg.tgname, sc.nspname, tb.relname 
+			FROM pg_trigger tg 
+			JOIN pg_class tb ON tb.oid = tg.tgrelid 
+			JOIN pg_namespace sc ON sc.oid = tb.relnamespace
+			WHERE sc.nspname = sch
+			AND tb.relname = tbl
+			AND tg.tgname = CONCAT('tg_',tbl,tblsuffix)
+		) THEN
+			cmd := $cmd$
+				CREATE TRIGGER "tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" AFTER INSERT OR UPDATE OR DELETE ON "$cmd$ || sch || $cmd$"."$cmd$ || tbl || $cmd$"
+				FOR EACH ROW EXECUTE PROCEDURE "$cmd$ || sch_hstlog || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"();
+			$cmd$;
+			EXECUTE cmd;
+			RETURN QUERY
+				SELECT CONCAT('tg_',tbl,tblsuffix)::VARCHAR AS object_name, 'TRIGGER'::VARCHAR AS object_type;
+		END IF;
+		-- =============================================================
+		-- VIEW
+		-- =============================================================
+		cmd := $cmd$
+			CREATE OR REPLACE VIEW "$cmd$ || sch_hstlog || $cmd$"."vw_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" AS (
+			WITH changes AS (
+				SELECT  id,
+						"$cmd$ || tbl || $cmd$_old",
+						"$cmd$ || tbl || $cmd$_new",
+						(
+							SELECT json_object_agg(COALESCE(old.key, new.key), old.value)
+							FROM json_each_text("$cmd$ || tbl || $cmd$_old"::json) old
+							FULL OUTER JOIN json_each_text("$cmd$ || tbl || $cmd$_new"::json) new ON new.key = old.key
+							WHERE new.value IS DISTINCT FROM old.value
+						) AS diff,
+						tg_usr,
+						tg_op,
+						executed_at
+				FROM "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"
+			), changes_and_fields AS (
+				SELECT  id,
+						"$cmd$ || tbl || $cmd$_old",
+						"$cmd$ || tbl || $cmd$_new",
+						(SELECT array_agg(fields) FROM json_object_keys(diff) fields) AS mod_fields,
+						tg_usr,
+						tg_op,
+					executed_at
+				FROM changes
+			)
+			SELECT  id,
+					"$cmd$ || tbl || $cmd$_old",
+					"$cmd$ || tbl || $cmd$_new",
+					unnest(mod_fields) AS mod_field,
+					tg_usr,
+					tg_op,
+					executed_at
+			FROM changes_and_fields
+			);
+		$cmd$;
+		EXECUTE cmd;
+		RETURN QUERY
+			SELECT CONCAT('vw_',tbl,tblsuffix)::VARCHAR AS object_name, 'VIEW'::VARCHAR AS object_type;
+		END IF;
+	END IF;
+
+	RETURN;
+
+END; 
+$BODY$;
+
+-- FUNÇÃO MANUAL PARA REMOVER A ESTRUTURA DE AUDITLOG SEM REMOVER A TABELA PRINCIPAL
+CREATE OR REPLACE FUNCTION public.fn_audit_tables_drop(
+	p_table character varying)
+    RETURNS TABLE(object_name character varying, object_type character varying) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT SECURITY DEFINER PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+DECLARE sch_hstlog VARCHAR;
+DECLARE sch VARCHAR;
+DECLARE tbl VARCHAR;
+DECLARE tblsuffix VARCHAR DEFAULT '_auditlog';
+DECLARE cmd VARCHAR;
+DECLARE obj RECORD;
+DECLARE parent VARCHAR;
+BEGIN
+    SET client_min_messages = 'error';
+
+	SELECT s.nspname FROM pg_namespace s JOIN pg_class t ON t.relnamespace = s.oid AND t.relname = p_table AND t.relkind = 'r' INTO sch;
+	sch_hstlog := CONCAT(sch,tblsuffix);
+	tbl := p_table;
+	SELECT tp.inhparent::VARCHAR FROM pg_inherits tp JOIN pg_class t ON t.oid = tp.inhrelid WHERE t.relname = p_table INTO parent;
+
+	IF tbl NOT LIKE '%_' || tblsuffix AND parent IS NULL THEN
+		IF EXISTS (
+			SELECT t.relname
+			FROM pg_class t
+			JOIN pg_namespace s ON s.oid = t.relnamespace
+			WHERE s.nspname = sch_hstlog
+			AND t.relname = CONCAT(tbl,tblsuffix)
+		) THEN
+			-- DROP VIEW
+			cmd := $cmd$
+				DROP VIEW IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."vw_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$";
+			$cmd$;
+			EXECUTE cmd;
+			RETURN QUERY
+				SELECT CONCAT('vw_',tbl,tblsuffix)::VARCHAR AS object_name, 'VIEW'::VARCHAR AS object_type;
+			-- DROP TRIGGER
+			cmd := $cmd$
+				DROP TRIGGER IF EXISTS "tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" ON "$cmd$ || sch || $cmd$"."$cmd$ || tbl || $cmd$";
+			$cmd$;
+			EXECUTE cmd;
+			RETURN QUERY
+				SELECT CONCAT('tg_',tbl,tblsuffix)::VARCHAR AS object_name, 'TRIGGER'::VARCHAR AS object_type;
+			-- DROP TRIGGER FUNCTION
+			cmd := $cmd$
+				DROP FUNCTION IF EXISTS "$cmd$ || sch || $cmd$"."tg_$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$"();
+			$cmd$;
+			EXECUTE cmd;
+			RETURN QUERY
+				SELECT CONCAT('tg_',tbl,tblsuffix)::VARCHAR AS object_name, 'FUNCTION'::VARCHAR AS object_type;
+			-- DROP PARTITION TABLE
+			cmd := $cmd$
+				DROP TABLE IF EXISTS "$cmd$ || sch_hstlog || $cmd$"."$cmd$ || CONCAT(tbl,tblsuffix) || $cmd$" CASCADE;
+			$cmd$;
+			EXECUTE cmd;
+			RETURN QUERY
+				SELECT CONCAT(tbl,tblsuffix)::VARCHAR AS object_name, 'TABLE'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_insert')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_update')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_delete')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_truncate')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_default')::VARCHAR AS object_name, 'TABLE PARTITION'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_tg_op')::VARCHAR AS object_name, 'TRIGGER'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_insert_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_update_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_delete_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_truncate_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type UNION ALL
+				SELECT CONCAT(tbl,tblsuffix,'_default_brin')::VARCHAR AS object_name, 'INDEX TYPE BRIN'::VARCHAR AS object_type;
+		END IF;
+	END IF;
+
+	RETURN;
+
+END; 
+$BODY$;
