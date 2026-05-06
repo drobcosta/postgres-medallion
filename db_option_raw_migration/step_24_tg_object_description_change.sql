@@ -109,3 +109,19 @@ BEGIN
 
 	RETURN NEW;
 END; $BODY$;
+
+CREATE TRIGGER tg_object_description_change AFTER UPDATE ON data_catalog.tb_databases
+FOR EACH ROW WHEN ((NEW.description != OLD.description) AND (OLD.tb_status_id = NEW.tb_status_id) AND (NEW.tb_status_id = 5)) 
+EXECUTE PROCEDURE data_catalog.tg_object_description_change('databases');
+
+CREATE TRIGGER tg_object_description_change AFTER UPDATE ON data_catalog.tb_schemas
+FOR EACH ROW WHEN ((NEW.description != OLD.description) AND (OLD.tb_status_id = NEW.tb_status_id) AND (NEW.tb_status_id = 5)) 
+EXECUTE PROCEDURE data_catalog.tg_object_description_change('schemas');
+
+CREATE TRIGGER tg_object_description_change AFTER UPDATE ON data_catalog.tb_tables
+FOR EACH ROW WHEN ((NEW.description != OLD.description) AND (OLD.tb_status_id = NEW.tb_status_id) AND (NEW.tb_status_id = 5)) 
+EXECUTE PROCEDURE data_catalog.tg_object_description_change('tables');
+
+CREATE TRIGGER tg_object_description_change AFTER UPDATE ON data_catalog.tb_columns
+FOR EACH ROW WHEN ((NEW.description != OLD.description) AND (OLD.tb_status_id = NEW.tb_status_id) AND (NEW.tb_status_id = 5)) 
+EXECUTE PROCEDURE data_catalog.tg_object_description_change('columns');
