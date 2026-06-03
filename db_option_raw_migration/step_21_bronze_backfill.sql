@@ -603,13 +603,19 @@ BEGIN
 		            update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
 		            updated_at = clock_timestamp()
 		            WHERE id = v_record.bronze_layer_control_id;
-		          ELSIF (COALESCE(v_qty,0) = 0 OR v_update_timestamp >= v_target_timestamp) THEN
+		          ELSIF COALESCE(v_qty,0) = 0 THEN
 		            UPDATE data_catalog.bronze_backfill_control SET
 		            update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
 		            update_done = true,
 		            updated_at = clock_timestamp()
 		            WHERE id = v_record.bronze_layer_control_id;
 		          END IF;
+
+				  IF v_update_timestamp >= v_target_timestamp THEN
+		            UPDATE data_catalog.bronze_backfill_control SET
+		            update_done = true
+		            WHERE id = v_record.bronze_layer_control_id;
+				  END IF;
 		        END IF;
 
 				RETURN QUERY
