@@ -546,24 +546,6 @@ BEGIN
 					AND tc.constraint_type = 'PRIMARY KEY'
 					AND kcu.column_name IS NULL
 				) columns_not_pk
-				-- SELECT	CONCAT(string_agg(CONCAT('"',column_name,'"'),', ')) AS bronze_columns_not_pk
-				-- 		, CONCAT(string_agg(CONCAT('"',column_name,'" = ds."',column_name,'"'),', ')) AS bronze_raw_columns
-				-- FROM (
-				-- 	SELECT tc.constraint_name AS pk_name, c.column_name, c.data_type
-				-- 	FROM information_schema.columns c
-				-- 	LEFT JOIN information_schema.table_constraints tc
-				-- 		ON tc.table_schema = c.table_schema
-				-- 		AND tc.table_name = c.table_name
-				-- 	LEFT JOIN information_schema.key_column_usage kcu
-				-- 		ON kcu.table_schema = tc.table_schema
-				-- 		AND kcu.table_name = tc.table_name
-				-- 		AND kcu.constraint_name = tc.constraint_name
-				-- 		AND kcu.column_name = c.column_name
-				-- 	WHERE tc.table_schema = REPLACE(v_record.bronze_schema_name,'"','')
-				-- 	AND tc.table_name = v_record.table_name
-				-- 	AND tc.constraint_type = 'PRIMARY KEY'
-				-- 	AND kcu.column_name IS NULL
-				-- ) columns_not_pk
 				INTO v_bronze_columns_not_pk, v_bronze_raw_columns;
 	
 				-- Criando de forma dinâmica uma comparação para ser usada na cláusula WHERE entre as PKs
@@ -611,25 +593,24 @@ BEGIN
 					GROUP BY 1
 				$cmd$;
 
-				IF v_cmd IS NOT NULL THEN
-					EXECUTE v_cmd INTO v_update_timestamp, v_qty;
-
-					-- Atualizando a tabela bronze_backfill_control
-					-- Se na query em loop a coluna bronze_layer_control_id view NULL, então é um novo registro para controlarmos
-					IF COALESCE(v_qty,0) > 0 THEN
-						UPDATE data_catalog.bronze_backfill_control SET
-						update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
-						update_done = (CASE WHEN v_update_timestamp >= v_target_timestamp THEN true ELSE false END),
-						updated_at = clock_timestamp()
-						WHERE id = v_record.bronze_layer_control_id;
-					ELSIF COALESCE(v_qty,0) = 0 THEN
-						UPDATE data_catalog.bronze_backfill_control SET
-						update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
-						update_done = true,
-						updated_at = clock_timestamp()
-						WHERE id = v_record.bronze_layer_control_id;
-					END IF;
-				END IF;
+		        IF v_cmd IS NOT NULL THEN
+		          EXECUTE v_cmd INTO v_update_timestamp, v_qty;
+		
+		          -- Atualizando a tabela bronze_backfill_control
+		          -- Se na query em loop a coluna bronze_layer_control_id view NULL, então é um novo registro para controlarmos
+		          IF COALESCE(v_qty,0) > 0 THEN
+		            UPDATE data_catalog.bronze_backfill_control SET
+		            update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
+		            updated_at = clock_timestamp()
+		            WHERE id = v_record.bronze_layer_control_id;
+		          ELSIF (COALESCE(v_qty,0) = 0 OR v_update_timestamp >= v_target_timestamp) THEN
+		            UPDATE data_catalog.bronze_backfill_control SET
+		            update_timestamp = COALESCE(v_update_timestamp,update_timestamp),
+		            update_done = true,
+		            updated_at = clock_timestamp()
+		            WHERE id = v_record.bronze_layer_control_id;
+		          END IF;
+		        END IF;
 
 				RETURN QUERY
 					SELECT	bbc.id::INTEGER AS id
